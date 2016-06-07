@@ -70,28 +70,6 @@ class XMLGenerator {
     vector<BucketContent> contents;
 };
 
-Response buildResponse(int numOfContent, bool isTruncated,
-                       int numOfZeroKeys = 0) {
-    XMLGenerator generator;
-    XMLGenerator *gen = &generator;
-    gen->setName("s3test.pivotal.io")
-        ->setPrefix("s3files/")
-        ->setIsTruncated(isTruncated)
-        ->pushBuckentContent(BucketContent("s3files/", 0));
-
-    char buffer[32] = {0};
-    for (int i = 0; i < numOfContent; ++i) {
-        snprintf(buffer, 32, "files%d", i);
-        gen->pushBuckentContent(BucketContent(buffer, i + 1));
-    }
-
-    for (int i = 0; i < numOfZeroKeys; i++) {
-        snprintf(buffer, 32, "zerofiles%d", i);
-        gen->pushBuckentContent(BucketContent(buffer, 0));
-    }
-
-    return Response(gen->toXML());
-}
 
 class S3ServiceTest : public testing::Test {
    protected:
@@ -107,6 +85,29 @@ class S3ServiceTest : public testing::Test {
 
     // TearDown() is invoked immediately after a test finishes.
     virtual void TearDown() { delete s3service; }
+
+    Response buildListBucketResponse(int numOfContent, bool isTruncated,
+                           int numOfZeroKeys = 0) {
+        XMLGenerator generator;
+        XMLGenerator *gen = &generator;
+        gen->setName("s3test.pivotal.io")
+            ->setPrefix("s3files/")
+            ->setIsTruncated(isTruncated)
+            ->pushBuckentContent(BucketContent("s3files/", 0));
+
+        char buffer[32] = {0};
+        for (int i = 0; i < numOfContent; ++i) {
+            snprintf(buffer, 32, "files%d", i);
+            gen->pushBuckentContent(BucketContent(buffer, i + 1));
+        }
+
+        for (int i = 0; i < numOfZeroKeys; i++) {
+            snprintf(buffer, 32, "zerofiles%d", i);
+            gen->pushBuckentContent(BucketContent(buffer, 0));
+        }
+
+        return Response(gen->toXML());
+    }
 
     S3Service *s3service;
     S3Credential cred;
@@ -171,14 +172,35 @@ TEST_F(S3ServiceTest, ListBucketWithNormalBucket) {
     EXPECT_EQ(1, result->contents.size());
 }
 
+TEST_F(S3ServiceTest, ListBucketWithBucketWith1000Keys) {
+    EXPECT_CALL(mockRestfulService, get(_, _, _))
+        .WillOnce(Return(this->buildListBucketResponse(1000, false)));
+
+    ListBucketResult *result = s3service->ListBucket(
+        schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
+    EXPECT_NE((void *)NULL, result);
+    EXPECT_EQ(1000, result->contents.size());
+}
+
+TEST_F(S3ServiceTest, ListBucketWithBucketWith1001Keys) {
+    EXPECT_CALL(mockRestfulService, get(_, _, _))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1, false)));
+
+    ListBucketResult *result = s3service->ListBucket(
+        schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
+    EXPECT_NE((void *)NULL, result);
+    EXPECT_EQ(1001, result->contents.size());
+}
+
 TEST_F(S3ServiceTest, ListBucketWithBucketWithMoreThan1000Keys) {
     EXPECT_CALL(mockRestfulService, get(_, _, _))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(120, false)));
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(120, false)));
 
     ListBucketResult *result = s3service->ListBucket(
         schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
@@ -190,8 +212,8 @@ TEST_F(S3ServiceTest, ListBucketWithBucketWithTruncatedResponse) {
     Response EmptyResponse;
 
     EXPECT_CALL(mockRestfulService, get(_, _, _))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
         .WillOnce(Return(EmptyResponse));
 
     ListBucketResult *result = s3service->ListBucket(
@@ -201,9 +223,9 @@ TEST_F(S3ServiceTest, ListBucketWithBucketWithTruncatedResponse) {
 
 TEST_F(S3ServiceTest, ListBucketWithBucketWithZeroSizedKeys) {
     EXPECT_CALL(mockRestfulService, get(_, _, _))
-        .WillOnce(Return(buildResponse(0, true, 1000)))
-        .WillOnce(Return(buildResponse(1000, true)))
-        .WillOnce(Return(buildResponse(120, false, 8)));
+        .WillOnce(Return(this->buildListBucketResponse(0, true, 8)))
+        .WillOnce(Return(this->buildListBucketResponse(1000, true)))
+        .WillOnce(Return(this->buildListBucketResponse(120, false, 8)));
 
     ListBucketResult *result = s3service->ListBucket(
         schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
@@ -213,7 +235,7 @@ TEST_F(S3ServiceTest, ListBucketWithBucketWithZeroSizedKeys) {
 
 TEST_F(S3ServiceTest, ListBucketWithEmptyBucket) {
     EXPECT_CALL(mockRestfulService, get(_, _, _))
-        .WillOnce(Return(buildResponse(0, false, 0)));
+        .WillOnce(Return(this->buildListBucketResponse(0, false, 0)));
 
     ListBucketResult *result = s3service->ListBucket(
         schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
@@ -223,7 +245,7 @@ TEST_F(S3ServiceTest, ListBucketWithEmptyBucket) {
 
 TEST_F(S3ServiceTest, ListBucketWithAllZeroedFilesBucket) {
     EXPECT_CALL(mockRestfulService, get(_, _, _))
-        .WillOnce(Return(buildResponse(0, false, 2)));
+        .WillOnce(Return(this->buildListBucketResponse(0, false, 2)));
 
     ListBucketResult *result = s3service->ListBucket(
         schema, "us-west-2", "s3test.pivotal.io", "s3files/", cred);
