@@ -120,8 +120,17 @@ ListBucketResult *S3BucketReader::listBucketWithRetry(int retries) {
     CHECK_OR_DIE(this->s3interface != NULL);
 
     while (retries--) {
-        ListBucketResult *result = this->s3interface->ListBucket(
-            this->schema, this->region, this->bucket, this->prefix, this->cred);
+        ListBucketResult *result = NULL;
+        try {
+            result = this->s3interface->ListBucket(this->schema, this->region, this->bucket,
+                                                   this->prefix, this->cred);
+        } catch (std::runtime_error &error) {
+            S3WARN("Exception caught:%s", error.what());
+
+            // jump out the loop quietly and print remaining error
+            break;
+        }
+
         if (result != NULL) {
             return result;
         }

@@ -132,13 +132,13 @@ bool S3Service::checkAndParseBucketXML(ListBucketResult *result, xmlParserCtxtPt
     }
 
     // parseBucketXML will set marker for next round.
-    this->parseBucketXML(result, rootElement, marker);
-
-    return true;
+    return this->parseBucketXML(result, rootElement, marker);
 }
 
-void S3Service::parseBucketXML(ListBucketResult *result, xmlNode *root_element, string &marker) {
-    CHECK_OR_DIE((result != NULL && root_element != NULL));
+bool S3Service::parseBucketXML(ListBucketResult *result, xmlNode *root_element, string &marker) {
+    if (result == NULL || root_element == NULL) {
+        return false;
+    }
 
     xmlNodePtr cur;
     bool is_truncated = false;
@@ -226,7 +226,7 @@ void S3Service::parseBucketXML(ListBucketResult *result, xmlNode *root_element, 
         xmlFree(key);
     }
 
-    return;
+    return true;
 }
 
 // ListBucket list all keys in given bucket with given prefix.
