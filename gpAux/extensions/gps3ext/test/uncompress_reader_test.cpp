@@ -115,7 +115,12 @@ TEST_F(UncompressReaderTest, AbleToUncompressSmallCompressedData) {
     EXPECT_EQ(0, strncmp(hello, buf, count));
 }
 
-TEST_F(UncompressReaderTest, AbleToUncompressBigCompressedData) {
+TEST_F(UncompressReaderTest, AbleToUncompressWithSmallReadBuffer) {
+    // Test case for: caller uses buffer smaller than internal chunk.
+    //      total compressed data is small (12 bytes),
+    //      chunk size is 32 bytes
+    //      output buffer is smaller than chunk size (16 bytes).
+
     // resize to 32 for 'in' and 'out' buffer
     S3_ZIP_CHUNKSIZE = 32;
     uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
@@ -126,7 +131,52 @@ TEST_F(UncompressReaderTest, AbleToUncompressBigCompressedData) {
 
     setBufReaderByRawData(hello, sizeof(hello));
 
-    char outputBuffer[16];
+    char outputBuffer[16] = {0};
+
+    int expectedLen[] = {16, 16, 2, 0};
+    for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {
+        uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+        ASSERT_EQ(expectedLen[i], count);
+    }
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithSmallInternalReaderBuffer) {
+    // Test case for: internal read buffer (this->in) smaller than compressed data.
+    //      total compressed data is small (12 bytes),
+    //      chunk size is 10 bytes
+    //      output buffer is smaller than chunk size (9 bytes).
+
+    // resize to 32 for 'in' and 'out' buffer
+    S3_ZIP_CHUNKSIZE = 10;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    char hello[34];  // compress 34 'A' will produce 12 compressed bytes.
+    memset((void *)hello, 'A', sizeof(hello));
+    hello[sizeof(hello) - 1] = '\0';
+
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[9] = {0};
+
+    int expectedLen[] = {9, 1, 9, 1, 9, 1, 4, 0};
+    for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {
+        uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+        ASSERT_EQ(expectedLen[i], count);
+    }
+}
+
+TEST_F(UncompressReaderTest, DISABLED_AbleToUncompressWithLargeReadBuffer) {
+    // resize to 32 for 'in' and 'out' buffer
+    S3_ZIP_CHUNKSIZE = 32;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    char hello[S3_ZIP_CHUNKSIZE * 2 + 2];
+    memset((void *)hello, 'A', sizeof(hello));
+    hello[sizeof(hello) - 1] = '\0';
+
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[40];
 
     // read 1st 16 bytes
     uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
@@ -139,4 +189,23 @@ TEST_F(UncompressReaderTest, AbleToUncompressBigCompressedData) {
     // read 3rd 2 byte
     count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(2, count);
+}
+
+TEST_F(UncompressReaderTest, ReadFromOffsetForEachCall) {
+    S3_ZIP_CHUNKSIZE = 128;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    // Bigger chunk size, smaller read buffer from caller. Need read from offset for each call.
+    char hello[] = "abcdefghigklmnopqrstuvwxyz";
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[4];
+
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(4, count);
+
+    // read 2nd 16 bytes
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(4, count);
+    EXPECT_TRUE(strncmp("efgh", outputBuffer, count) == 0);
 }
