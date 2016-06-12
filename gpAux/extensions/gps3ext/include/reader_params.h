@@ -1,6 +1,10 @@
 #ifndef INCLUDE_READER_PARAMS_H_
 #define INCLUDE_READER_PARAMS_H_
 
+#include <string>
+
+#include "s3common.h"
+
 using std::string;
 
 class ReaderParams {
