@@ -69,14 +69,18 @@ class UncompressReaderTest : public testing::Test {
         uncompressReader.close();
     }
 
-    void setBufReaderByRawData(const char *input) {
-        uLong len = (uLong)strlen(input) + 1;
+    void setBufReaderByRawData(const char *input, int len) {
         uLong compressedLen = sizeof(compressionBuff);
 
         int err = compress(compressionBuff, &compressedLen, (const Bytef *)input, len);
         CHECK_ERR(err, "failed to compress sample data");
 
         bufReader.setData(compressionBuff, compressedLen);
+    }
+
+    void enableDebug() {
+        s3ext_loglevel = EXT_DEBUG;
+        s3ext_logtype = STDERR_LOG;
     }
 
     UncompressReader uncompressReader;
@@ -100,7 +104,7 @@ TEST_F(UncompressReaderTest, AbleToUncompressEmptyData) {
 TEST_F(UncompressReaderTest, AbleToUncompressSmallCompressedData) {
     // 1. compressed data to uncompress
     const char hello[] = "Go IPO, Pivotal! Go Go Go!!!";
-    setBufReaderByRawData(hello);
+    setBufReaderByRawData(hello, sizeof(hello));
 
     // 2. call API
     char buf[10000];
@@ -112,23 +116,27 @@ TEST_F(UncompressReaderTest, AbleToUncompressSmallCompressedData) {
 }
 
 TEST_F(UncompressReaderTest, AbleToUncompressBigCompressedData) {
-    // 1. compressed data to uncompress
+    // resize to 32 for 'in' and 'out' buffer
     S3_ZIP_CHUNKSIZE = 32;
     uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
 
-    char hello[S3_ZIP_CHUNKSIZE * 2 + 1];
+    char hello[S3_ZIP_CHUNKSIZE + 2];
     memset((void *)hello, 'A', sizeof(hello));
     hello[sizeof(hello) - 1] = '\0';
 
-    setBufReaderByRawData(hello);
+    setBufReaderByRawData(hello, sizeof(hello));
 
     char outputBuffer[16];
 
-    // 3. first round: 16 bytes
+    // read 1st 16 bytes
     uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(sizeof(outputBuffer), count);
 
-    // 4. 2nd round: 16 bytes
+    // read 2nd 16 bytes
     count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(sizeof(outputBuffer), count);
+
+    // read 3rd 2 byte
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(2, count);
 }
