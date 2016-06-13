@@ -76,7 +76,7 @@ uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
         //  2) We have no enough free-space in 'buf' to hold next entire 'out' buf.
         //      maybe next decompressed size < S3_ZIP_CHUNKSIZE, but we have no chance
         //      to predict it, so use the max value 'S3_ZIP_CHUNKSIZE' instead.
-        //     We can improve it in future by optimizing this conditions.
+        //      We can improve it in future by optimizing this conditions.
         if ((this->zstream.avail_in == 0 && this->zstream.avail_out == S3_ZIP_CHUNKSIZE) ||
             remainingBufLen < S3_ZIP_CHUNKSIZE) {
             readFinished = true;
