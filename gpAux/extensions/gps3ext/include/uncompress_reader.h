@@ -44,9 +44,9 @@ class UncompressReader : public Reader {
 
     // zlib related variables.
     z_stream zstream;
-    char *in;    // Input buffer for uncompression.
-    char *out;   // Output buffer for uncompression.
-    int offset;  // Next position to read in out buffer.
+    char *in;       // Input buffer for uncompression.
+    char *out;      // Output buffer for uncompression.
+    int outOffset;  // Next position to read in out buffer.
 };
 
 #endif /* INCLUDE_UNCOMPRESS_READER_H_ */

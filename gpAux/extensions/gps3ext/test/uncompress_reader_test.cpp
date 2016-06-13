@@ -165,32 +165,6 @@ TEST_F(UncompressReaderTest, AbleToUncompressWithSmallInternalReaderBuffer) {
     }
 }
 
-TEST_F(UncompressReaderTest, DISABLED_AbleToUncompressWithLargeReadBuffer) {
-    // resize to 32 for 'in' and 'out' buffer
-    S3_ZIP_CHUNKSIZE = 32;
-    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
-
-    char hello[S3_ZIP_CHUNKSIZE * 2 + 2];
-    memset((void *)hello, 'A', sizeof(hello));
-    hello[sizeof(hello) - 1] = '\0';
-
-    setBufReaderByRawData(hello, sizeof(hello));
-
-    char outputBuffer[40];
-
-    // read 1st 16 bytes
-    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
-    EXPECT_EQ(sizeof(outputBuffer), count);
-
-    // read 2nd 16 bytes
-    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
-    EXPECT_EQ(sizeof(outputBuffer), count);
-
-    // read 3rd 2 byte
-    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
-    EXPECT_EQ(2, count);
-}
-
 TEST_F(UncompressReaderTest, ReadFromOffsetForEachCall) {
     S3_ZIP_CHUNKSIZE = 128;
     uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
@@ -208,4 +182,171 @@ TEST_F(UncompressReaderTest, ReadFromOffsetForEachCall) {
     count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(4, count);
     EXPECT_TRUE(strncmp("efgh", outputBuffer, count) == 0);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithAlignedLargeReadBuffer) {
+    // Test case for: output buffer read(size) >= chunksize.
+    //      total compressed data is small (12 bytes),
+    //      chunk size is 8 bytes
+    //      output buffer is bigger than chunk size (16 bytes).
+
+    // resize to 8 for 'in' and 'out' buffer
+
+    S3_ZIP_CHUNKSIZE = 8;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    char hello[S3_ZIP_CHUNKSIZE * 2 + 2];
+    memset((void *)hello, 'A', sizeof(hello));
+    hello[sizeof(hello) - 1] = '\0';
+
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[16] = {0};
+
+    // read 1st 16 bytes
+    S3DEBUG("1st");
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(sizeof(outputBuffer), count);
+
+    // read 2nd 2 bytes
+    S3DEBUG("2nd");
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(2, count);
+
+    // read 3rd 0 byte
+    S3DEBUG("3rd");
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(0, count);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithUnalignedLargeReadBuffer) {
+    // Test case for: optimal buffer size fill after decompression
+    // We need to make sure that we are filling the decompression
+    // buffer fully before asking for a new chunck from the read buffer
+    S3_ZIP_CHUNKSIZE = 8;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    char hello[S3_ZIP_CHUNKSIZE * 6 + 2];
+    memset((void *)hello, 'A', sizeof(hello));
+    hello[sizeof(hello) - 1] = '\0';
+
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[S3_ZIP_CHUNKSIZE * 6 + 4];
+
+    // read once, decompress 6 times
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(48, count);
+
+    // read the last 2 bytes
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(2, count);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithEnoughSizeReadBuffer) {
+    // Test case for: optimal buffer size fill after decompression
+    // We need to make sure that we are filling the decompression
+    // buffer fully before asking for a new chunck from the read buffer
+    S3_ZIP_CHUNKSIZE = 8;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    char hello[S3_ZIP_CHUNKSIZE * 6 + 2];
+    memset((void *)hello, 'A', sizeof(hello));
+    hello[sizeof(hello) - 1] = '\0';
+
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    char outputBuffer[S3_ZIP_CHUNKSIZE * 8];
+
+    // read once, decompress 6 times
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(sizeof(hello), count);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithLargeReadBufferWithUncompressableString) {
+    S3_ZIP_CHUNKSIZE = 8;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    // Smaller chunk size, bigger read buffer from caller. Need composite multiple chunks.
+    char hello[] = "abcdefghigklmnopqrstuvwxyz";  // 26+1 bytes
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    // for chunksize = 8, upper string will be decompressed in four steps: 5, 8, 8, 6
+
+    char outputBuffer[20] = {0};
+
+    // read 16 bytes
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_TRUE(strncmp("abcdefghigklmnopqrstuvwxyz", outputBuffer, 5 + 8) == 0);
+    EXPECT_EQ(5 + 8, count);
+
+    count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(8 + 6, count);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithEnoughLargeReadBufferWithUncompressableString) {
+    S3_ZIP_CHUNKSIZE = 8;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    // Smaller chunk size, bigger read buffer from caller. Need composite multiple chunks.
+    char hello[] = "abcdefghigklmnopqrstuvwxyz";  // 26+1 bytes
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    // for chunksize = 8, upper string will be decompressed in four steps: 5, 8, 8, 6
+
+    char outputBuffer[40] = {0};
+
+    // read 26+1 bytes
+    uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+    EXPECT_EQ(sizeof(hello), count);
+    EXPECT_TRUE(strncmp("abcdefghigklmnopqrstuvwxyz", outputBuffer, count) == 0);
+}
+
+TEST_F(UncompressReaderTest, AbleToUncompressWithSmartLargeReadBufferWithUncompressableString) {
+    S3_ZIP_CHUNKSIZE = 7;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    // Smaller chunk size, bigger read buffer from caller. Need composite multiple chunks.
+    char hello[] = "abcdefghigklmnopqrstuvwxyz";  // 26+1 bytes
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    // for chunksize = 7, upper string will be decompressed in four steps: 4, 7, 7, 7, 2
+
+    char outputBuffer[9] = {0};
+
+    // read 16 bytes
+    int expectedLen[] = {4, 7, 7, 7, 2};
+    int offset = 0;
+    for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {
+        uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+        EXPECT_TRUE(strncmp(hello + offset, outputBuffer, count) == 0);
+        ASSERT_EQ(expectedLen[i], count);
+        offset += count;
+    }
+}
+
+TEST_F(UncompressReaderTest,
+       DISABLED_AbleToUncompressWithSmarterLargeReadBufferWithUncompressableString) {
+    enableDebug();
+
+    S3_ZIP_CHUNKSIZE = 7;
+    uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
+
+    // Smaller chunk size, bigger read buffer from caller. Need composite multiple chunks.
+    char hello[] = "abcdefghigklmnopqrstuvwxyz";  // 26+1 bytes
+    setBufReaderByRawData(hello, sizeof(hello));
+
+    // for chunksize = 7, upper string will be decompressed in four steps: 4, 7, 7, 7, 2
+
+    char outputBuffer[9] = {0};
+
+    // read 16 bytes
+    int expectedLen[] = {9, 9, 9};
+    int offset = 0;
+    for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {
+        uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
+        EXPECT_TRUE(strncmp(hello + offset, outputBuffer, count) == 0);
+        ASSERT_EQ(expectedLen[i], count);
+        offset += count;
+    }
 }

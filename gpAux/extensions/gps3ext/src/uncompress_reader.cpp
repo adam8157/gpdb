@@ -1,11 +1,14 @@
-#include "uncompress_reader.h"
+#include <algorithm>
+
 #include "s3log.h"
 #include "s3macros.h"
+#include "uncompress_reader.h"
 
 UncompressReader::UncompressReader() {
     this->reader = NULL;
     this->in = new char[S3_ZIP_CHUNKSIZE];
     this->out = new char[S3_ZIP_CHUNKSIZE];
+    this->outOffset = 0;
 }
 
 UncompressReader::~UncompressReader() {
@@ -19,7 +22,7 @@ void UncompressReader::resizeUncompressReaderBuffer(int size) {
     delete this->out;
     this->in = new char[size];
     this->out = new char[size];
-    this->offset = 0;
+    this->outOffset = 0;
     this->zstream.avail_out = size;
 }
 
@@ -37,7 +40,7 @@ void UncompressReader::open(const ReaderParams &params) {
 
     zstream.avail_in = 0;
     zstream.avail_out = S3_ZIP_CHUNKSIZE;
-    this->offset = 0;
+    this->outOffset = 0;
 
     // 47 is the number of windows bits, to make sure zlib could recognize and decode gzip stream.
     int ret = inflateInit2(&zstream, 47);
@@ -45,22 +48,41 @@ void UncompressReader::open(const ReaderParams &params) {
 }
 
 uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
-    int remainingLen = S3_ZIP_CHUNKSIZE - this->zstream.avail_out - this->offset;
+    uint64_t ret = 0;
+    uint64_t remainingBufLen = bufSize;
+    uint64_t remainingOutLen = S3_ZIP_CHUNKSIZE - this->zstream.avail_out - this->outOffset;
+    bool readFinished = false;
 
-    S3DEBUG("has = %d, offset = %d, chunksize = %d, avail_out = %d, count = %d", remainingLen,
-            offset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
+    do {
+        S3DEBUG("has = %d, offset = %d, chunksize = %d, avail_out = %d, count = %d",
+                remainingOutLen, outOffset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
 
-    if (this->offset < (S3_ZIP_CHUNKSIZE - this->zstream.avail_out)) {
-        // read remaining data in out buffer uncompressed last time.
-    } else {
-        this->uncompress();
-        this->offset = 0;  // reset cursor for out buffer to read from beginning.
-        remainingLen = S3_ZIP_CHUNKSIZE - this->zstream.avail_out;
-    }
+        if (this->outOffset < (S3_ZIP_CHUNKSIZE - this->zstream.avail_out)) {
+            // read remaining data in out buffer uncompressed last time.
+        } else {
+            this->uncompress();
+            this->outOffset = 0;  // reset cursor for out buffer to read from beginning.
+            remainingOutLen = S3_ZIP_CHUNKSIZE - this->zstream.avail_out;
+        }
 
-    int ret = (remainingLen > bufSize ? bufSize : remainingLen);
-    memcpy(buf, this->out + offset, ret);
-    this->offset += ret;
+        int count = std::min(remainingOutLen, remainingBufLen);
+        memcpy(buf + ret, this->out + outOffset, count);
+        this->outOffset += count;
+        remainingBufLen -= count;
+        ret += count;
+
+        // when to break?
+        //  1) Decompress is done, no more data in 'in' buf. Or
+        //  2) We have no enough free-space in 'buf' to hold next entire 'out' buf.
+        //      maybe next decompressed size < S3_ZIP_CHUNKSIZE, but we have no chance
+        //      to predict it, so use the max value 'S3_ZIP_CHUNKSIZE' instead.
+        //     We can improve it in future by optimizing this conditions.
+        if ((this->zstream.avail_in == 0 && this->zstream.avail_out == S3_ZIP_CHUNKSIZE) ||
+            remainingBufLen < S3_ZIP_CHUNKSIZE) {
+            readFinished = true;
+        }
+
+    } while (!readFinished);
 
     return ret;
 }
