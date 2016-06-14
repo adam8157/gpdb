@@ -209,17 +209,14 @@ TEST_F(UncompressReaderTest, AbleToUncompressWithAlignedLargeReadBuffer) {
     char outputBuffer[16] = {0};
 
     // read 1st 16 bytes
-    S3DEBUG("1st");
     uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(sizeof(outputBuffer), count);
 
     // read 2nd 2 bytes
-    S3DEBUG("2nd");
     count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(2, count);
 
     // read 3rd 0 byte
-    S3DEBUG("3rd");
     count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_EQ(0, count);
 }
@@ -280,7 +277,6 @@ TEST_F(UncompressReaderTest, AbleToUncompressWithLargeReadBufferWithUncompressab
 
     char outputBuffer[20] = {0};
 
-    // read 16 bytes
     uint64_t count = uncompressReader.read(outputBuffer, sizeof(outputBuffer));
     EXPECT_TRUE(strncmp("abcdefghigklmnopqrstuvwxyz", outputBuffer, 5 + 8) == 0);
     EXPECT_EQ(5 + 8, count);
@@ -354,4 +350,5 @@ TEST_F(UncompressReaderTest,
         ASSERT_EQ(expectedLen[i], count);
         offset += count;
     }
+    resetLogLevel();
 }

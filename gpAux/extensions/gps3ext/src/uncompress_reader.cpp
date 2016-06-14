@@ -3,6 +3,8 @@
 #include "s3log.h"
 #include "s3macros.h"
 #include "uncompress_reader.h"
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 UncompressReader::UncompressReader() {
     this->reader = NULL;
@@ -54,7 +56,7 @@ uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
     bool readFinished = false;
 
     do {
-        S3DEBUG("has = %d, offset = %d, chunksize = %d, avail_out = %d, count = %d",
+        S3DEBUG("has = %" PRIu64 ", offset = %d, chunksize = %u, avail_out = %u, count = %" PRIu64,
                 remainingOutLen, outOffset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
 
         if (this->outOffset < (S3_ZIP_CHUNKSIZE - this->zstream.avail_out)) {
@@ -98,8 +100,8 @@ void UncompressReader::uncompress() {
         uint64_t hasRead = this->reader->read(this->in, S3_ZIP_CHUNKSIZE);
         if (hasRead == 0) {
             S3DEBUG(
-                "No more data to uncompress: avail_in = %d, avail_out = %d, total_in = %d, "
-                "total_out = %d",
+                "No more data to uncompress: avail_in = %u, avail_out = %u, total_in = %u, "
+                "total_out = %u",
                 zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
             return;  // EOF
         }
@@ -112,7 +114,7 @@ void UncompressReader::uncompress() {
         this->zstream.next_out = (Byte *)this->out;
     }
 
-    S3DEBUG("Before decompress: avail_in = %d, avail_out = %d, total_in = %d, total_out = %d",
+    S3DEBUG("Before decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
             zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
 
     int status = inflate(&this->zstream, Z_NO_FLUSH);
@@ -123,7 +125,7 @@ void UncompressReader::uncompress() {
         CHECK_OR_DIE_MSG(false, "failed to decompress data: %d", status);
     }
 
-    S3DEBUG("After decompress: avail_in = %d, avail_out = %d, total_in = %d, total_out = %d",
+    S3DEBUG("After decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
             zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
 
     return;
