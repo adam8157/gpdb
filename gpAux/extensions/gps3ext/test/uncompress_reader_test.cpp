@@ -24,15 +24,6 @@ class MockBufferReader : public Reader {
         this->data.insert(this->data.end(), p, p + size);
     }
 
-    uint8_t &operator[](uint64_t index) {
-        return data[index];
-    }
-
-    void resizeData(uint64_t size) {
-        data.resize(size);
-        data.shrink_to_fit();
-    }
-
     uint64_t read(char *buf, uint64_t count) {
         uint64_t remaining = this->data.size() - offset;
         if (remaining <= 0) {
