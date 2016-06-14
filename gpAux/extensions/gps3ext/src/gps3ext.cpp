@@ -18,7 +18,6 @@
 #include "utils/memutils.h"
 
 #include "gpreader.h"
-#include "gps3ext.h"
 #include "s3common.h"
 #include "s3conf.h"
 #include "s3log.h"
