@@ -73,19 +73,25 @@ class UncompressReaderTest : public testing::Test {
     }
 
     void enableDebug() {
+        originLogLevel = s3ext_loglevel;
+        originLogType = s3ext_logtype;
         s3ext_loglevel = EXT_DEBUG;
         s3ext_logtype = STDERR_LOG;
     }
 
     void resetLogLevel() {
-        s3ext_loglevel = -1;
-        s3ext_logtype = -1;
+        s3ext_loglevel = originLogLevel;
+        s3ext_logtype = originLogType;
     }
 
     UncompressReader uncompressReader;
     ReaderParams params;
     MockBufferReader bufReader;
     Byte compressionBuff[10000];
+
+    // Store the original log level and type level
+    int32_t originLogLevel;
+    int32_t originLogType;
 };
 
 TEST_F(UncompressReaderTest, AbleToUncompressEmptyData) {

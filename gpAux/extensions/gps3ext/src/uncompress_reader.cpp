@@ -58,7 +58,7 @@ uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
                 remainingOutLen, outOffset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
 
         if (this->outOffset < (S3_ZIP_CHUNKSIZE - this->zstream.avail_out)) {
-            // read remaining data in out buffer uncompressed last time.
+            // Read remaining data in out buffer uncompressed last time.
         } else {
             this->uncompress();
             this->outOffset = 0;  // reset cursor for out buffer to read from beginning.
@@ -71,7 +71,7 @@ uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
         remainingBufLen -= count;
         ret += count;
 
-        // when to break?
+        // When to break?
         //  1) Decompress is done, no more data in 'in' buf. Or
         //  2) We have no enough free-space in 'buf' to hold next entire 'out' buf.
         //      maybe next decompressed size < S3_ZIP_CHUNKSIZE, but we have no chance
