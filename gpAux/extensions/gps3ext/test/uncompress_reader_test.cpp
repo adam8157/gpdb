@@ -6,17 +6,9 @@
 
 using std::vector;
 
-#define CHECK_ERR(err, msg)                              \
-    {                                                    \
-        if (err != Z_OK) {                               \
-            fprintf(stderr, "%s error: %d\n", msg, err); \
-            exit(1);                                     \
-        }                                                \
-    }
-
-class BufferReader : public Reader {
+class MockBufferReader : public Reader {
    public:
-    BufferReader() {
+    MockBufferReader() {
         this->offset = 0;
     }
 
@@ -73,7 +65,9 @@ class UncompressReaderTest : public testing::Test {
         uLong compressedLen = sizeof(compressionBuff);
 
         int err = compress(compressionBuff, &compressedLen, (const Bytef *)input, len);
-        CHECK_ERR(err, "failed to compress sample data");
+        if (err != Z_OK) {
+            S3DEBUG("failed to compress sample data");
+        }
 
         bufReader.setData(compressionBuff, compressedLen);
     }
@@ -83,15 +77,20 @@ class UncompressReaderTest : public testing::Test {
         s3ext_logtype = STDERR_LOG;
     }
 
+    void resetLogLevel() {
+        s3ext_loglevel = -1;
+        s3ext_logtype = -1;
+    }
+
     UncompressReader uncompressReader;
     ReaderParams params;
-    BufferReader bufReader;
+    MockBufferReader bufReader;
     Byte compressionBuff[10000];
 };
 
 TEST_F(UncompressReaderTest, AbleToUncompressEmptyData) {
     unsigned char input[10] = {0};
-    BufferReader bufReader;
+    MockBufferReader bufReader;
     bufReader.setData(input, 0);
     uncompressReader.setReader(&bufReader);
 
@@ -285,6 +284,8 @@ TEST_F(UncompressReaderTest, AbleToUncompressWithLargeReadBufferWithUncompressab
 }
 
 TEST_F(UncompressReaderTest, AbleToUncompressWithEnoughLargeReadBufferWithUncompressableString) {
+    // Test case for: the input data is uncompressable, hence the size of "compressed" data is
+    // larger than original size of data.
     S3_ZIP_CHUNKSIZE = 8;
     uncompressReader.resizeUncompressReaderBuffer(S3_ZIP_CHUNKSIZE);
 
@@ -314,7 +315,6 @@ TEST_F(UncompressReaderTest, AbleToUncompressWithSmartLargeReadBufferWithUncompr
 
     char outputBuffer[9] = {0};
 
-    // read 16 bytes
     int expectedLen[] = {4, 7, 7, 7, 2};
     int offset = 0;
     for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {
@@ -340,7 +340,6 @@ TEST_F(UncompressReaderTest,
 
     char outputBuffer[9] = {0};
 
-    // read 16 bytes
     int expectedLen[] = {9, 9, 9};
     int offset = 0;
     for (int i = 0; i < sizeof(expectedLen) / sizeof(int); i++) {

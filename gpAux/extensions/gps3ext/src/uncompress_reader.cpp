@@ -94,7 +94,7 @@ void UncompressReader::uncompress() {
         this->zstream.avail_out = S3_ZIP_CHUNKSIZE;
         this->zstream.next_out = (Byte *)this->out;
 
-        // 1. reader S3_ZIP_CHUNKSIZE data from underlying reader and put into this->in buffer.
+        // reader S3_ZIP_CHUNKSIZE data from underlying reader and put into this->in buffer.
         uint64_t hasRead = this->reader->read(this->in, S3_ZIP_CHUNKSIZE);
         if (hasRead == 0) {
             S3DEBUG(
