@@ -30,6 +30,11 @@ class S3BucketReader : public Reader {
     void validateURL();
     ListBucketResult *listBucketWithRetry(int retries);
 
+    // for test only
+    ListBucketResult *getKeyList() {
+        return keyList;
+    }
+
    protected:
     // Get URL for a S3 object/file.
     string getKeyURL(const string &key);
@@ -38,6 +43,7 @@ class S3BucketReader : public Reader {
     int segId;   // segment id
     int segNum;  // total number of segments
     int chunkSize;
+    int numOfChunks;
 
     string url;
     string schema;

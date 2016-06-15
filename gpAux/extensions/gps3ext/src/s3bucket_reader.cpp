@@ -39,6 +39,8 @@ void S3BucketReader::open(const ReaderParams &params) {
     this->segId = params.getSegId();
     this->segNum = params.getSegNum();
     this->cred = params.getCred();
+    this->chunkSize = params.getChunkSize();
+    this->numOfChunks = params.getNumOfChunks();
 
     this->validateURL();
     this->keyList = this->listBucketWithRetry(3);
@@ -62,6 +64,8 @@ ReaderParams S3BucketReader::getReaderParams(BucketContent *key) {
     params.setRegion(this->region);
     params.setKeySize(key->getSize());
     params.setChunkSize(this->chunkSize);
+    params.setNumOfChunks(this->numOfChunks);
+
     S3DEBUG("key: %s, size: %" PRIu64, params.getKeyUrl().c_str(), params.getKeySize());
     return params;
 }

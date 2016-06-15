@@ -1,72 +1,12 @@
 #include "s3interface.cpp"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "mock_classes.h"
 
 using ::testing::AtLeast;
 using ::testing::Return;
 using ::testing::Throw;
 using ::testing::_;
-
-class MockS3RESTfulService : public RESTfulService {
-   public:
-    MOCK_METHOD3(get, Response(const string &url, HTTPHeaders &headers,
-                               const map<string, string> &params));
-};
-
-class XMLGenerator {
-   public:
-    XMLGenerator() : isTruncated(false) {
-    }
-
-    XMLGenerator *setName(string name) {
-        this->name = name;
-        return this;
-    }
-    XMLGenerator *setPrefix(string prefix) {
-        this->prefix = prefix;
-        return this;
-    }
-    XMLGenerator *setMarker(string marker) {
-        this->marker = marker;
-        return this;
-    }
-    XMLGenerator *setIsTruncated(bool isTruncated) {
-        this->isTruncated = isTruncated;
-        return this;
-    }
-    XMLGenerator *pushBuckentContent(BucketContent content) {
-        this->contents.push_back(content);
-        return this;
-    }
-
-    vector<uint8_t> toXML() {
-        stringstream sstr;
-        sstr << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-             << "<ListBucketResult>"
-             << "<Name>" << name << "</Name>"
-             << "<Prefix>" << prefix << "</Prefix>"
-             << "<Marker>" << marker << "</Marker>"
-             << "<IsTruncated>" << (isTruncated ? "true" : "false") << "</IsTruncated>";
-
-        for (vector<BucketContent>::iterator it = contents.begin(); it != contents.end(); it++) {
-            sstr << "<Contents>"
-                 << "<Key>" << it->name << "</Key>"
-                 << "<Size>" << it->size << "</Size>"
-                 << "</Contents>";
-        }
-        sstr << "</ListBucketResult>";
-        string xml = sstr.str();
-        return vector<uint8_t>(xml.begin(), xml.end());
-    }
-
-   private:
-    string name;
-    string prefix;
-    string marker;
-    bool isTruncated;
-
-    vector<BucketContent> contents;
-};
 
 class S3ServiceTest : public testing::Test {
    protected:

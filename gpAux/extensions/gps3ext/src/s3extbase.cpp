@@ -14,7 +14,7 @@ S3ExtBase::S3ExtBase(const string &url) {
 
     // TODO: move into config
     this->cred.secret = s3ext_secret;
-    this->cred.keyid = s3ext_accessid;
+    this->cred.accessID = s3ext_accessid;
 
     this->segid = s3ext_segid;
     this->segnum = s3ext_segnum;
