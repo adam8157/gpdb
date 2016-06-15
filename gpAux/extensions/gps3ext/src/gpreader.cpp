@@ -284,10 +284,11 @@ bool reader_cleanup(S3Reader **reader) {
 static MUTEX_TYPE *mutex_buf = NULL;
 
 static void locking_function(int mode, int n, const char *file, int line) {
-    if (mode & CRYPTO_LOCK)
+    if (mode & CRYPTO_LOCK) {
         MUTEX_LOCK(mutex_buf[n]);
-    else
+    } else {
         MUTEX_UNLOCK(mutex_buf[n]);
+    }
 }
 
 static unsigned long id_function(void) {
@@ -295,24 +296,28 @@ static unsigned long id_function(void) {
 }
 
 int thread_setup(void) {
-    int i;
-
-    mutex_buf = (pthread_mutex_t *)malloc(CRYPTO_num_locks() * sizeof(MUTEX_TYPE));
-    if (!mutex_buf) return 0;
-    for (i = 0; i < CRYPTO_num_locks(); i++) MUTEX_SETUP(mutex_buf[i]);
+    mutex_buf = new pthread_mutex_t[CRYPTO_num_locks()];
+    if (mutex_buf == NULL) {
+        return 0;
+    }
+    for (int i = 0; i < CRYPTO_num_locks(); i++) {
+        MUTEX_SETUP(mutex_buf[i]);
+    }
     CRYPTO_set_id_callback(id_function);
     CRYPTO_set_locking_callback(locking_function);
     return 1;
 }
 
 int thread_cleanup(void) {
-    int i;
-
-    if (!mutex_buf) return 0;
+    if (mutex_buf == NULL) {
+        return 0;
+    }
     CRYPTO_set_id_callback(NULL);
     CRYPTO_set_locking_callback(NULL);
-    for (i = 0; i < CRYPTO_num_locks(); i++) MUTEX_CLEANUP(mutex_buf[i]);
-    free(mutex_buf);
+    for (int i = 0; i < CRYPTO_num_locks(); i++) {
+        MUTEX_CLEANUP(mutex_buf[i]);
+    }
+    delete mutex_buf;
     mutex_buf = NULL;
     return 1;
 }
