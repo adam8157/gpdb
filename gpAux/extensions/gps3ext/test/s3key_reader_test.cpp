@@ -607,3 +607,27 @@ TEST_F(S3KeyReaderTest, MTReadWithGPDBCancel) {
 
     EXPECT_THROW(keyReader->read(buffer, 127), std::runtime_error);
 }
+
+TEST_F(S3KeyReaderTest, MTReadWithHundredsOfThreadsAndSignalCancel) {
+    params.setNumOfChunks(127);
+    params.setRegion("us-west-2");
+    params.setKeySize(1024);
+    params.setChunkSize(64);
+
+    EXPECT_CALL(s3interface, fetchData(_, _, _, _, _, _)).WillRepeatedly(Return(64));
+
+    keyReader->open(params);
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(2, keyReader->read(buffer, 31));
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(2, keyReader->read(buffer, 31));
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(31, keyReader->read(buffer, 31));
+    EXPECT_EQ(2, keyReader->read(buffer, 31));
+
+    QueryCancelPending = true;
+
+    EXPECT_THROW(keyReader->read(buffer, 31), std::runtime_error);
+}
