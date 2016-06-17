@@ -64,9 +64,9 @@ Datum s3_import(PG_FUNCTION_ARGS) {
     if (EXTPROTOCOL_IS_LAST_CALL(fcinfo)) {
         thread_cleanup();
 
-        gpreader->close();
-        delete gpreader;
+        GPReader::reader_cleanup(gpreader);
         gpreader = NULL;
+        EXTPROTOCOL_SET_USER_CTX(fcinfo, NULL);
 
         PG_RETURN_INT32(0);
     }
@@ -76,18 +76,15 @@ Datum s3_import(PG_FUNCTION_ARGS) {
         const char *url_with_options = EXTPROTOCOL_GET_URL(fcinfo);
 
         thread_setup();
-        gpreader = new GPReader(url_with_options);
 
-        gpreader->open(params);
-
+        gpreader = GPReader::reader_init(url_with_options);
         EXTPROTOCOL_SET_USER_CTX(fcinfo, gpreader);
     }
 
     char *data_buf = EXTPROTOCOL_GET_DATABUF(fcinfo);
     int32 data_len = EXTPROTOCOL_GET_DATALEN(fcinfo);
 
-    int32 readLen = (int32)gpreader->read(data_buf, (uint64_t)data_len);
-
+    int32 readLen = (int32)GPReader::reader_transfer_data(gpreader, data_buf, data_len);
     PG_RETURN_INT32(readLen);
 }
 

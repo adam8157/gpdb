@@ -22,6 +22,26 @@ S3BucketReader::S3BucketReader() : Reader() {
 
     this->s3interface = NULL;
     this->upstreamReader = NULL;
+
+    this->numOfChunks = 0;
+    this->chunkSize = -1;
+
+    this->segId = -1;
+    this->segNum = -1;
+
+    this->needNewReader = true;
+}
+
+S3BucketReader::S3BucketReader(const string &url) : Reader() {
+    this->url = url;
+
+    this->keyIndex = -1;
+    this->keyList = NULL;
+
+    this->s3interface = NULL;
+    this->upstreamReader = NULL;
+
+    this->numOfChunks = 0;
     this->chunkSize = -1;
 
     this->segId = -1;

@@ -9,7 +9,7 @@
 
 class GPReader : public Reader {
    public:
-    GPReader(const string &urlWithOptions);
+    GPReader(const string &url);
     virtual ~GPReader() {
     }
 
@@ -24,7 +24,7 @@ class GPReader : public Reader {
     virtual void close();
 
    private:
-    void constructReaderParam(const string &urlWithOptions);
+    void constructReaderParam(const string &url);
 
    protected:
     S3BucketReader bucketReader;
@@ -39,6 +39,11 @@ class GPReader : public Reader {
     // but the pointer here leaves a chance to mock it in unit test
     S3RESTfulService *restfulServicePtr;
 };
+
+// Following 3 functions are invoked by s3_import(), need to be exception safe
+GPReader *reader_init(const char *url_with_options);
+bool reader_transfer_data(GPReader *reader, char *data_buf, int &data_len);
+bool reader_cleanup(GPReader **reader);
 
 // Two thread related functions, called only by gpreader and gpcheckcloud
 int thread_setup(void);

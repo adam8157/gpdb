@@ -5,6 +5,7 @@
 
 #include "gpcommon.h"
 #include "gpreader.h"
+
 #include "s3conf.h"
 #include "s3log.h"
 #include "s3macros.h"
@@ -19,9 +20,9 @@
 #define THREAD_ID pthread_self()
 
 /* This array will store all of the mutexes available to OpenSSL. */
-static MUTEX_TYPE *mutex_buf = NULL;
+static MUTEX_TYPE* mutex_buf = NULL;
 
-static void locking_function(int mode, int n, const char *file, int line) {
+static void locking_function(int mode, int n, const char* file, int line) {
     if (mode & CRYPTO_LOCK) {
         MUTEX_LOCK(mutex_buf[n]);
     } else {
@@ -60,43 +61,134 @@ int thread_cleanup(void) {
     return 1;
 }
 
-GPReader::GPReader(const string &urlWithOptions) {
-    constructReaderParam(urlWithOptions);
+GPReader::GPReader(const string& url) {
+    constructReaderParam(url);
     restfulServicePtr = &restfulService;
 }
 
-void GPReader::constructReaderParam(const string &urlWithOptions) {
-    string config_path = get_opt_s3(urlWithOptions, "config");
-    InitConfig(config_path.c_str(), "default");
+void GPReader::constructReaderParam(const string& url) {
+    this->params.setUrlToLoad(url);
+    this->params.setSegId(s3ext_segid);
+    this->params.setSegNum(s3ext_segnum);
+    this->params.setNumOfChunks(s3ext_threadnum);
+    this->params.setChunkSize(s3ext_chunksize);
 
-    string url = truncate_options(urlWithOptions);
-    params.setUrlToLoad(url);
-    params.setSegId(s3ext_segid);
-    params.setSegNum(s3ext_segnum);
-    params.setNumOfChunks(s3ext_threadnum);
-    params.setChunkSize(s3ext_chunksize);
-
-    cred.accessID = s3ext_accessid;
-    cred.secret = s3ext_secret;
-    params.setCred(cred);
+    this->cred.accessID = s3ext_accessid;
+    this->cred.secret = s3ext_secret;
+    this->params.setCred(this->cred);
 }
 
-void GPReader::open(const ReaderParams &params) {
-    s3service.setRESTfulService(restfulServicePtr);
-    bucketReader.setS3interface(&s3service);
-    keyReader.setS3interface(&s3service);
-    bucketReader.setUpstreamReader(&keyReader);
-    bucketReader.open(this->params);
+void GPReader::open(const ReaderParams& params) {
+    this->s3service.setRESTfulService(this->restfulServicePtr);
+    this->bucketReader.setS3interface(&this->s3service);
+    this->keyReader.setS3interface(&this->s3service);
+    this->bucketReader.setUpstreamReader(&this->keyReader);
+    this->bucketReader.open(this->params);
 }
 
 // read() attempts to read up to count bytes into the buffer starting at
 // buffer.
 // Return 0 if EOF. Throw exception if encounters errors.
-uint64_t GPReader::read(char *buf, uint64_t count) {
-    return bucketReader.read(buf, count);
+uint64_t GPReader::read(char* buf, uint64_t count) {
+    return this->bucketReader.read(buf, count);
 }
 
 // This should be reentrant, has no side effects when called multiple times.
 void GPReader::close() {
-    bucketReader.close();
+    this->bucketReader.close();
+}
+
+// invoked by s3_import(), need to be exception safe
+GPReader* reader_init(const char* url_with_options) {
+    GPReader* reader = NULL;
+
+    try {
+        if (!url_with_options) {
+            return NULL;
+        }
+
+        string urlWithOptions(url_with_options);
+        string url = truncate_options(urlWithOptions);
+
+        if (url.empty()) {
+            return NULL;
+        }
+
+        string config_path = get_opt_s3(urlWithOptions, "config");
+        if (config_path.empty()) {
+            config_path = "s3/s3.conf";
+        }
+
+        if (!InitConfig(config_path, "default")) {
+            return NULL;
+        }
+
+        InitRemoteLog();
+
+        reader = new GPReader(url);
+        if (reader == NULL) {
+            return NULL;
+        }
+
+        ReaderParams param;
+        reader->open(param);
+        return reader;
+
+    } catch (std::exception& e) {
+        if (reader != NULL) {
+            delete reader;
+            return NULL;
+        }
+        S3ERROR("reader_init caught an exception: %s, aborting", e.what());
+        return NULL;
+    }
+}
+
+// invoked by s3_import(), need to be exception safe
+bool reader_transfer_data(GPReader* reader, char* data_buf, int& data_len) {
+    try {
+        if (!reader || !data_buf || (data_len < 0)) {
+            return false;
+        }
+
+        if (data_len == 0) {
+            return true;
+        }
+
+        uint64_t read_len = reader->read(data_buf, data_len);
+        if (read_len == 0) {
+            return false;
+
+            // FIXME: read an empty file and return zero?
+        }
+
+        // sure read_len <= data_len here, hence truncation will never happen
+        data_len = (int)read_len;
+    } catch (std::exception& e) {
+        S3ERROR("reader_transfer_data caught an exception: %s, aborting", e.what());
+        return false;
+    }
+
+    return true;
+}
+
+// invoked by s3_import(), need to be exception safe
+bool reader_cleanup(GPReader** reader) {
+    bool result = true;
+    try {
+        if (*reader) {
+            (*reader)->close();
+            delete *reader;
+            *reader = NULL;
+        } else {
+            result = false;
+        }
+    } catch (std::exception& e) {
+        S3ERROR("reader_cleanup caught an exception: %s, aborting", e.what());
+        result = false;
+    }
+
+    // Cleanup function for the XML library.
+    xmlCleanupParser();
+    return result;
 }

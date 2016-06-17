@@ -13,6 +13,7 @@ using std::string;
 class S3BucketReader : public Reader {
    public:
     S3BucketReader();
+    S3BucketReader(const string &url);
     ~S3BucketReader();
 
     void open(const ReaderParams &params);
@@ -33,6 +34,16 @@ class S3BucketReader : public Reader {
     // for test only
     ListBucketResult *getKeyList() {
         return keyList;
+    }
+
+    const string &getRegion() {
+        return region;
+    }
+    const string &getBucket() {
+        return bucket;
+    }
+    const string &getPrefix() {
+        return prefix;
     }
 
    protected:

@@ -21,10 +21,17 @@ class MockGPReader : public GPReader {
     }
 };
 
-TEST(GPReader, Construct) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test.conf";
+class GPReaderTest : public testing::Test {
+   protected:
+    virtual void SetUp() {
+        InitConfig("data/s3test.conf", "default");
+    }
+    virtual void TearDown() {
+    }
+};
+
+TEST_F(GPReaderTest, Construct) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     GPReader gpreader(url);
 
     EXPECT_EQ("secret_test", s3ext_secret);
@@ -32,10 +39,8 @@ TEST(GPReader, Construct) {
     EXPECT_EQ("ABCDEFGabcdefg", s3ext_token);
 }
 
-TEST(GPReader, Open) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test.conf";
+TEST_F(GPReaderTest, Open) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
 
@@ -60,10 +65,8 @@ TEST(GPReader, Open) {
     EXPECT_EQ(3, keyList->contents[0]->getSize());
 }
 
-TEST(GPReader, Close) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test.conf";
+TEST_F(GPReaderTest, Close) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
 
@@ -90,10 +93,8 @@ TEST(GPReader, Close) {
     EXPECT_EQ(NULL, keyList);
 }
 
-TEST(GPReader, ReadSmallData) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test_64kchunk.conf";
+TEST_F(GPReaderTest, ReadSmallData) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
 
@@ -158,6 +159,7 @@ class MockS3RESTfulServiceForMultiThreads : public MockS3RESTfulService {
             index == rangeNumber.length() ? data.size() : std::stoi(rangeNumber.substr(index + 1));
 
         vector<uint8_t> responseData(data.begin() + begin, data.begin() + end + 1);
+
         return Response(RESPONSE_OK, responseData);
     }
 
@@ -169,12 +171,12 @@ class MockS3RESTfulServiceForMultiThreads : public MockS3RESTfulService {
     vector<uint8_t> data;
 };
 
-TEST(GPReader, ReadHugeData) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test.conf";
+TEST_F(GPReaderTest, ReadHugeData) {
+    InitConfig("data/s3test_64kchunk.conf", "default");
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
 
-    uint64_t totalData = 64 * 1024 * 16;
+    // 17M. We don't know the chunksize before we load_config()
+    uint64_t totalData = 1024 * 1024 * 128;
 
     MockS3RESTfulServiceForMultiThreads mockRestfulService(totalData);
     MockGPReader gpreader(url, &mockRestfulService);
@@ -188,16 +190,6 @@ TEST(GPReader, ReadHugeData) {
         ->pushBuckentContent(BucketContent("threebytes/threebytes", totalData));
 
     Response listBucketResponse(RESPONSE_OK, gen->toXML());
-
-    vector<uint8_t> keyContent;
-
-    // generate 3 bytes in random way
-    srand(time(NULL));
-    keyContent.push_back(rand() & 0xFF);
-    keyContent.push_back(rand() & 0xFF);
-    keyContent.push_back(rand() & 0xFF);
-
-    Response keyReaderResponse(RESPONSE_OK, keyContent);
 
     // call mockGet() instead of simply return a Response.
     EXPECT_CALL(mockRestfulService, get(_, _, _))
@@ -214,18 +206,18 @@ TEST(GPReader, ReadHugeData) {
     EXPECT_EQ(totalData, keyList->contents[0]->getSize());
 
     // compare the data content
-    char buffer[64];
+    static char buffer[1024 * 1024];
     uint64_t size = sizeof(buffer);
     for (uint64_t i = 0; i < totalData; i += size) {
         EXPECT_EQ(size, gpreader.read(buffer, size));
-        EXPECT_EQ(0, memcmp(buffer, mockRestfulService.getData() + i, size));
+        ASSERT_EQ(0, memcmp(buffer, mockRestfulService.getData() + i, size));
     }
 
     // Guarantee the last call
     EXPECT_EQ(0, gpreader.read(buffer, sizeof(buffer)));
 }
 
-TEST(GPReader, ReadFromEmptyURL) {
+TEST_F(GPReaderTest, ReadFromEmptyURL) {
     string url;
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
@@ -236,10 +228,8 @@ TEST(GPReader, ReadFromEmptyURL) {
     EXPECT_THROW(gpreader.open(params), std::runtime_error);
 }
 
-TEST(GPReader, ReadFromInvalidURL) {
-    string url =
-        "s3://"
-        " config=test/data/s3test_64kchunk.conf";
+TEST_F(GPReaderTest, ReadFromInvalidURL) {
+    string url = "s3://";
 
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
@@ -250,10 +240,8 @@ TEST(GPReader, ReadFromInvalidURL) {
     EXPECT_THROW(gpreader.open(params), std::runtime_error);
 }
 
-TEST(GPReader, ReadAndGetFailedListBucketResponse) {
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test.conf";
+TEST_F(GPReaderTest, ReadAndGetFailedListBucketResponse) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
 
@@ -267,12 +255,8 @@ TEST(GPReader, ReadAndGetFailedListBucketResponse) {
     EXPECT_THROW(gpreader.open(params), std::runtime_error);
 }
 
-TEST(GPReader, ReadAndGetFailedKeyReaderResponse) {
-    DebugSwitch::enable();
-
-    string url =
-        "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal"
-        " config=test/data/s3test_64kchunk.conf";
+TEST_F(GPReaderTest, ReadAndGetFailedKeyReaderResponse) {
+    string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
     MockS3RESTfulService mockRestfulService;
     MockGPReader gpreader(url, &mockRestfulService);
 
