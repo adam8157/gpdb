@@ -1,5 +1,5 @@
 # Include
-include ../include/makefile.in
+include ../include/makefile.inc
 
 # Options
 ARCH = $(shell uname -s)

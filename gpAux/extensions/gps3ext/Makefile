@@ -1,5 +1,5 @@
 # Include
-include ./include/makefile.in
+include ./include/makefile.inc
 
 # Options
 DEBUG_S3_SYMBOL = y
@@ -21,7 +21,7 @@ PGXS := $(shell pg_config --pgxs)
 include $(PGXS)
 
 gpcheckcloud:
-	@make -C src/gpcheckcloud
+	@make -C bin/gpcheckcloud
 
 test: format
 	@make -C test test
@@ -41,7 +41,7 @@ format:
 
 cleanall:
 	@-make clean # incase PGXS not included
-	@-make -C src/gpcheckcloud clean
+	@-make -C bin/gpcheckcloud clean
 	@make -C test clean
 	rm -f *.o *.so *.a
 	rm -f *.gcov src/*.gcov src/*.gcda src/*.gcno
