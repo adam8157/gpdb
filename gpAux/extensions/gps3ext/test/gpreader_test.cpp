@@ -172,10 +172,12 @@ class MockS3RESTfulServiceForMultiThreads : public MockS3RESTfulService {
 };
 
 TEST_F(GPReaderTest, ReadHugeData) {
-    InitConfig("data/s3test_64kchunk.conf", "default");
+    InitConfig("data/s3test.conf", "smallchunk");
     string url = "s3://s3-us-west-2.amazonaws.com/s3test.pivotal.io/dataset1/normal";
 
-    // 17M. We don't know the chunksize before we load_config()
+    // We don't know the chunksize before we load_config()
+    //    so we create a big enough data (128M), to force
+    //    multiple-threads to be constructed and loop-read to be triggered.
     uint64_t totalData = 1024 * 1024 * 128;
 
     MockS3RESTfulServiceForMultiThreads mockRestfulService(totalData);
@@ -184,10 +186,10 @@ TEST_F(GPReaderTest, ReadHugeData) {
     XMLGenerator generator;
     XMLGenerator* gen = &generator;
     gen->setName("s3test.pivotal.io")
-        ->setPrefix("threebytes/")
+        ->setPrefix("bigdata/")
         ->setIsTruncated(false)
-        ->pushBuckentContent(BucketContent("threebytes/", 0))
-        ->pushBuckentContent(BucketContent("threebytes/threebytes", totalData));
+        ->pushBuckentContent(BucketContent("bigdata/", 0))
+        ->pushBuckentContent(BucketContent("bigdata/bigdata", totalData));
 
     Response listBucketResponse(RESPONSE_OK, gen->toXML());
 
@@ -202,7 +204,7 @@ TEST_F(GPReaderTest, ReadHugeData) {
     // compare the data size
     ListBucketResult* keyList = gpreader.getBucketReader().getKeyList();
     EXPECT_EQ(1, keyList->contents.size());
-    EXPECT_EQ("threebytes/threebytes", keyList->contents[0]->getName());
+    EXPECT_EQ("bigdata/bigdata", keyList->contents[0]->getName());
     EXPECT_EQ(totalData, keyList->contents[0]->getSize());
 
     // compare the data content

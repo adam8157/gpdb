@@ -4,10 +4,6 @@
 #include <map>
 #include <string>
 
-#include <curl/curl.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-
 #include "gpcommon.h"
 #include "http_parser.h"
 #include "s3http_headers.h"

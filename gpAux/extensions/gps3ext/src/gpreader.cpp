@@ -156,11 +156,6 @@ bool reader_transfer_data(GPReader* reader, char* data_buf, int& data_len) {
         }
 
         uint64_t read_len = reader->read(data_buf, data_len);
-        if (read_len == 0) {
-            return false;
-
-            // FIXME: read an empty file and return zero?
-        }
 
         // sure read_len <= data_len here, hence truncation will never happen
         data_len = (int)read_len;
@@ -188,7 +183,5 @@ bool reader_cleanup(GPReader** reader) {
         result = false;
     }
 
-    // Cleanup function for the XML library.
-    xmlCleanupParser();
     return result;
 }

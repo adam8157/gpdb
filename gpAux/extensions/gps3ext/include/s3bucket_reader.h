@@ -13,7 +13,6 @@ using std::string;
 class S3BucketReader : public Reader {
    public:
     S3BucketReader();
-    S3BucketReader(const string &url);
     ~S3BucketReader();
 
     void open(const ReaderParams &params);
@@ -29,6 +28,11 @@ class S3BucketReader : public Reader {
     }
 
     void validateURL();
+    void validateURL(const string &url) {
+        this->url = url;
+        validateURL();
+    };
+
     ListBucketResult *listBucketWithRetry(int retries);
 
     // for test only

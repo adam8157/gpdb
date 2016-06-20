@@ -35,6 +35,7 @@ class XMLContextHolder {
 };
 
 S3Service::S3Service() : service(NULL) {
+    xmlInitParser();
 }
 
 S3Service::~S3Service() {
@@ -307,7 +308,7 @@ uint64_t S3Service::fetchData(uint64_t offset, char *data, uint64_t len, const s
     } else if (resp.getStatus() == RESPONSE_ERROR) {
         xmlParserCtxtPtr xmlptr = getXMLContext(resp);
         if (!checkXMLMessage(xmlptr)) {
-            S3ERROR("Check XML Failed");
+            S3ERROR("Failed to check XML error message.");
         }
         return 0;
     } else {

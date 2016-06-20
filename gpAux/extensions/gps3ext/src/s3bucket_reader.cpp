@@ -32,24 +32,6 @@ S3BucketReader::S3BucketReader() : Reader() {
     this->needNewReader = true;
 }
 
-S3BucketReader::S3BucketReader(const string &url) : Reader() {
-    this->url = url;
-
-    this->keyIndex = -1;
-    this->keyList = NULL;
-
-    this->s3interface = NULL;
-    this->upstreamReader = NULL;
-
-    this->numOfChunks = 0;
-    this->chunkSize = -1;
-
-    this->segId = -1;
-    this->segNum = -1;
-
-    this->needNewReader = true;
-}
-
 S3BucketReader::~S3BucketReader() {
     this->close();
 }
@@ -149,7 +131,7 @@ ListBucketResult *S3BucketReader::listBucketWithRetry(int retries) {
             return result;
         }
 
-        S3INFO("Can't get keylist from bucket %s, retrying ...", this->bucket.c_str());
+        S3INFO("Can't get keylist from bucket '%s', retrying ...", this->bucket.c_str());
     }
 
     S3ERROR("Failed to list bucket for URL: %s", this->url.c_str());

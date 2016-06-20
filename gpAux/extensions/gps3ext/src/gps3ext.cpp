@@ -64,8 +64,10 @@ Datum s3_import(PG_FUNCTION_ARGS) {
     if (EXTPROTOCOL_IS_LAST_CALL(fcinfo)) {
         thread_cleanup();
 
-        GPReader::reader_cleanup(gpreader);
-        gpreader = NULL;
+        if (!reader_cleanup(&gpreader)) {
+            ereport(ERROR, (0, errmsg("Failed to cleanup S3 extention")));
+        }
+
         EXTPROTOCOL_SET_USER_CTX(fcinfo, NULL);
 
         PG_RETURN_INT32(0);
@@ -77,15 +79,26 @@ Datum s3_import(PG_FUNCTION_ARGS) {
 
         thread_setup();
 
-        gpreader = GPReader::reader_init(url_with_options);
+        gpreader = reader_init(url_with_options);
+        if (!gpreader) {
+            ereport(ERROR, (0, errmsg("Failed to init S3 extension, segid = %d, "
+                                      "segnum = %d, please check your "
+                                      "configurations and net connection",
+                                      s3ext_segid, s3ext_segnum)));
+        }
+
+        check_essential_config();
+
         EXTPROTOCOL_SET_USER_CTX(fcinfo, gpreader);
     }
 
     char *data_buf = EXTPROTOCOL_GET_DATABUF(fcinfo);
     int32 data_len = EXTPROTOCOL_GET_DATALEN(fcinfo);
 
-    int32 readLen = (int32)GPReader::reader_transfer_data(gpreader, data_buf, data_len);
-    PG_RETURN_INT32(readLen);
+    if (!reader_transfer_data(gpreader, data_buf, data_len)) {
+        ereport(ERROR, (0, errmsg("s3_import: could not read data")));
+    }
+    PG_RETURN_INT32(data_len);
 }
 
 /*
