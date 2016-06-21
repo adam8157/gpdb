@@ -154,6 +154,7 @@ class MockS3RESTfulServiceForMultiThreads : public MockS3RESTfulService {
         string rangeNumber = range.substr(index + 1);
         index = rangeNumber.find("-");
 
+        // stoi is not available in C++98, use sscanf as workaround.
         int begin, end;
         if (index > 0) {
             sscanf(rangeNumber.substr(0, index).c_str(), "%d", &begin);
