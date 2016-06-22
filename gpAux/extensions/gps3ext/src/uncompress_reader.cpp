@@ -6,7 +6,7 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-unsigned int S3_ZIP_CHUNKSIZE = 256 * 1024;
+unsigned int S3_ZIP_CHUNKSIZE = 1024 * 1024 * 2;
 
 UncompressReader::UncompressReader() {
     this->reader = NULL;
@@ -60,8 +60,9 @@ uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
     bool readFinished = false;
 
     do {
-        S3DEBUG("has = %" PRIu64 ", offset = %d, chunksize = %u, avail_out = %u, count = %" PRIu64,
-                remainingOutLen, outOffset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
+        // S3DEBUG("has = %" PRIu64 ", offset = %d, chunksize = %u, avail_out = %u, count = %"
+        // PRIu64,
+        //     remainingOutLen, outOffset, S3_ZIP_CHUNKSIZE, this->zstream.avail_out, bufSize);
 
         if (this->outOffset < (S3_ZIP_CHUNKSIZE - this->zstream.avail_out)) {
             // Read remaining data in out buffer uncompressed last time.
