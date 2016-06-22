@@ -54,8 +54,9 @@ class UncompressReaderTest : public testing::Test {
    protected:
     // Remember that SetUp() is run immediately before a test starts.
     virtual void SetUp() {
-        uncompressReader.open(params);
+        // need to setup upstreamReader before open.
         uncompressReader.setReader(&bufReader);
+        uncompressReader.open(params);
     }
 
     // TearDown() is invoked immediately after a test finishes.
@@ -94,7 +95,7 @@ TEST_F(UncompressReaderTest, AbleToUncompressEmptyData) {
 
 TEST_F(UncompressReaderTest, AbleToUncompressSmallCompressedData) {
     // 1. compressed data to uncompress
-    const char hello[] = "Go IPO, Pivotal! Go Go Go!!!";
+    const char hello[] = "The quick brown fox jumps over the lazy dog";
     setBufReaderByRawData(hello, sizeof(hello));
 
     // 2. call API
