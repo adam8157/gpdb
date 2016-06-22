@@ -1,10 +1,3 @@
-/*
- * s3common_reader.cpp
- *
- *  Created on: Jun 21, 2016
- *      Author: pqiu
- */
-
 #include "s3common_reader.h"
 #include "s3macros.h"
 

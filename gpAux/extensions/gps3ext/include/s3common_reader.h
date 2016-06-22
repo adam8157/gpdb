@@ -1,10 +1,3 @@
-/*
- * s3common_reader.h
- *
- *  Created on: Jun 21, 2016
- *      Author: pqiu
- */
-
 #ifndef INCLUDE_S3COMMON_READER_H_
 #define INCLUDE_S3COMMON_READER_H_
 

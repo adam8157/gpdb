@@ -118,8 +118,8 @@ void UncompressReader::uncompress() {
         this->zstream.next_out = (Byte *)this->out;
     }
 
-    S3DEBUG("Before decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
-            zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
+    // S3DEBUG("Before decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
+    //      zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
 
     int status = inflate(&this->zstream, Z_NO_FLUSH);
     if (status == Z_STREAM_END) {
@@ -129,8 +129,8 @@ void UncompressReader::uncompress() {
         CHECK_OR_DIE_MSG(false, "failed to decompress data: %d", status);
     }
 
-    S3DEBUG("After decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
-            zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
+    // S3DEBUG("After decompress: avail_in = %u, avail_out = %u, total_in = %u, total_out = %u",
+    //     zstream.avail_in, zstream.avail_out, zstream.total_in, zstream.total_out);
 
     return;
 }

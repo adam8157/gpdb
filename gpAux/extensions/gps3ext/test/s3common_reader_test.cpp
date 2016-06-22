@@ -1,9 +1,3 @@
-/*
- * s3common_reader_test.cpp
- *
- *  Created on: Jun 21, 2016
- *      Author: pqiu
- */
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -42,14 +36,6 @@ class S3CommonReaderTest : public ::testing::Test, public S3CommonReader {
     virtual void TearDown() {
     }
 
-    void setBufReaderByRawData(const void *input, int len, Byte *compressionBuff,
-                               uLong compressedLen) {
-        int err = compress(compressionBuff, &compressedLen, (const Bytef *)input, len);
-        if (err != Z_OK) {
-            S3DEBUG("failed to compress sample data");
-        }
-    }
-
     MockS3InterfaceForCompressionRead mockS3Interface;
 };
 
@@ -82,7 +68,7 @@ TEST_F(S3CommonReaderTest, OpenPlain) {
 TEST_F(S3CommonReaderTest, ReadGZip) {
     Byte compressionBuff[0x100];
     uLong compressedLen = sizeof(compressionBuff);
-    const char hello[] = "Go IPO, Pivotal! Go Go Go!!!";
+    const char hello[] = "The quick brown fox jumps over the lazy dog";
 
     compress(compressionBuff, &compressedLen, (const Bytef *)hello, sizeof(hello));
 
@@ -103,5 +89,5 @@ TEST_F(S3CommonReaderTest, ReadGZip) {
 
     EXPECT_EQ(sizeof(hello), this->upstreamReader->read(result, sizeof(result)));
     EXPECT_EQ(0, this->upstreamReader->read(result, sizeof(result)));
-    EXPECT_EQ(0, strcmp(result, hello));
+    EXPECT_EQ(0, memcmp(result, hello, sizeof(hello)));
 }

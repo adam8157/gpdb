@@ -95,7 +95,7 @@ TEST_F(UncompressReaderTest, AbleToUncompressEmptyData) {
 
 TEST_F(UncompressReaderTest, AbleToUncompressSmallCompressedData) {
     // 1. compressed data to uncompress
-    const char hello[] = "Go IPO, Pivotal! Go Go Go!!!";
+    const char hello[] = "The quick brown fox jumps over the lazy dog";
     setBufReaderByRawData(hello, sizeof(hello));
 
     // 2. call API
