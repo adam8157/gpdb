@@ -54,8 +54,9 @@ class UncompressReaderTest : public testing::Test {
    protected:
     // Remember that SetUp() is run immediately before a test starts.
     virtual void SetUp() {
-        uncompressReader.open(params);
+        // need to setup upstreamReader before open.
         uncompressReader.setReader(&bufReader);
+        uncompressReader.open(params);
     }
 
     // TearDown() is invoked immediately after a test finishes.

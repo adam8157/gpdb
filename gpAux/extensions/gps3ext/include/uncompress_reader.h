@@ -16,7 +16,7 @@
 #include "reader.h"
 
 // 256K by default
-unsigned int S3_ZIP_CHUNKSIZE = 256 * 1024;
+extern unsigned int S3_ZIP_CHUNKSIZE;
 
 class UncompressReader : public Reader {
    public:

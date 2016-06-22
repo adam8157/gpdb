@@ -6,6 +6,8 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
+unsigned int S3_ZIP_CHUNKSIZE = 256 * 1024;
+
 UncompressReader::UncompressReader() {
     this->reader = NULL;
     this->in = new char[S3_ZIP_CHUNKSIZE];
@@ -47,6 +49,8 @@ void UncompressReader::open(const ReaderParams &params) {
     // 47 is the number of windows bits, to make sure zlib could recognize and decode gzip stream.
     int ret = inflateInit2(&zstream, 47);
     CHECK_OR_DIE_MSG(ret == Z_OK, "%s", "failed to initialize zlib library");
+
+    this->reader->open(params);
 }
 
 uint64_t UncompressReader::read(char *buf, uint64_t bufSize) {
@@ -133,4 +137,5 @@ void UncompressReader::uncompress() {
 
 void UncompressReader::close() {
     inflateEnd(&zstream);
+    this->reader->close();
 }
