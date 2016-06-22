@@ -6,7 +6,6 @@ int main(int argc, char *argv[]) {
     int opt = 0;
     bool ret = true;
 
-    s3ext_logtype = STDERR_LOG;
     s3ext_loglevel = EXT_ERROR;
 
     if (argc == 1) {
@@ -67,24 +66,6 @@ void print_usage(FILE *stream) {
             "       gpcheckcloud -h, to show this help.\n");
 }
 
-bool read_config(const char *config) {
-    bool ret = false;
-
-    ret = InitConfig(config, "default");
-    s3ext_logtype = STDERR_LOG;
-
-    return ret;
-}
-
-ListBucketResult *list_bucket(S3Reader *wrapper) {
-    S3Credential g_cred = {s3ext_accessid, s3ext_secret};
-
-    ListBucketResult *r = ListBucket("https", wrapper->get_region(), wrapper->get_bucket(),
-                                     wrapper->get_prefix(), g_cred);
-
-    return r;
-}
-
 uint8_t print_contents(ListBucketResult *r) {
     char urlbuf[256];
     uint8_t count = 0;
@@ -107,63 +88,30 @@ uint8_t print_contents(ListBucketResult *r) {
 }
 
 bool check_config(const char *url_with_options) {
-    char *url_str = truncate_options(url_with_options);
-    if (!url_str) {
+    if (!url_with_options) {
         return false;
     }
 
-    char *config_path = get_opt_s3(url_with_options, "config");
-    if (!config_path) {
-        free(url_str);
+    GPReader *reader = reader_init(url_with_options);
+    if (!reader) {
+        fprintf(stderr, "Failed to initialize reader\n");
         return false;
     }
 
-    curl_global_init(CURL_GLOBAL_ALL);
-
-    S3Reader *wrapper = NULL;
-    ListBucketResult *result = NULL;
-    bool ret = false;
-
-    if (!read_config(config_path)) {
-        goto FAIL;
-    }
-
-    wrapper = new S3Reader(url_str);
-    if (!wrapper) {
-        fprintf(stderr, "Failed to allocate wrapper\n");
-        goto FAIL;
-    }
-
-    if (!wrapper->ValidateURL()) {
-        fprintf(stderr, "Failed: URL is not valid.\n");
-        goto FAIL;
-    }
-
-    result = list_bucket(wrapper);
-    if (!result) {
-        goto FAIL;
-    } else {
+    ListBucketResult *result = reader->getKeyList();
+    if (result != NULL) {
         if (print_contents(result)) {
-            printf("Yea! Your configuration works well.\n");
+            printf("\nYea! Your configuration works well.\n");
         } else {
             printf(
-                "Your configuration works well, however there is no file "
+                "\nYour configuration works well, however there is no file "
                 "matching your prefix.\n");
         }
-        delete result;
     }
 
-    ret = true;
+    reader_cleanup(&reader);
 
-FAIL:
-    free(url_str);
-    free(config_path);
-
-    if (wrapper) {
-        delete wrapper;
-    }
-
-    return ret;
+    return true;
 }
 
 bool s3_download(const char *url_with_options) {
@@ -171,57 +119,33 @@ bool s3_download(const char *url_with_options) {
         return false;
     }
 
-    S3Reader *wrapper = NULL;
     int data_len = BUF_SIZE;
+    char data_buf[BUF_SIZE];
+    bool ret = true;
 
     thread_setup();
 
-    char *data_buf = (char *)malloc(BUF_SIZE);
-    if (!data_buf) {
-        goto FAIL;
+    GPReader *reader = reader_init(url_with_options);
+    if (!reader) {
+        fprintf(stderr, "Failed to initialize reader\n");
+        return false;
     }
-
-    s3ext_logtype = STDERR_LOG;
-
-    wrapper = reader_init(url_with_options);
-    if (!wrapper) {
-        fprintf(stderr, "Failed to init wrapper\n");
-        goto FAIL;
-    }
-
-    s3ext_segid = 0;
-    s3ext_segnum = 1;
 
     do {
         data_len = BUF_SIZE;
 
-        if (!reader_transfer_data(wrapper, data_buf, data_len)) {
+        if (!reader_transfer_data(reader, data_buf, data_len)) {
             fprintf(stderr, "Failed to read data\n");
-            goto FAIL;
+            ret = false;
+            break;
         }
 
         fwrite(data_buf, data_len, 1, stdout);
     } while (data_len);
 
+    reader_cleanup(&reader);
+
     thread_cleanup();
 
-    if (!reader_cleanup(&wrapper)) {
-        fprintf(stderr, "Failed to cleanup wrapper\n");
-        goto FAIL;
-    }
-
-    free(data_buf);
-
-    return true;
-
-FAIL:
-    if (data_buf) {
-        free(data_buf);
-    }
-
-    if (wrapper) {
-        delete wrapper;
-    }
-
-    return false;
+    return ret;
 }
