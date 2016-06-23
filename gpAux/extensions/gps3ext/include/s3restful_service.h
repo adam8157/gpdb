@@ -5,8 +5,6 @@
 
 class S3RESTfulService : public RESTfulService {
    public:
-    S3RESTfulService();
-    virtual ~S3RESTfulService();
     Response get(const string& url, HTTPHeaders& headers, const map<string, string>& params);
 };
 

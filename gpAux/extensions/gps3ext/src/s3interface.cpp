@@ -259,18 +259,16 @@ ListBucketResult *S3Service::listBucket(const string &schema, const string &regi
         // S3 requires query parameters specified alphabetically.
         string url = this->getUrl(prefix, schema, host.str(), bucket, marker);
 
-        xmlParserCtxtPtr xmlcontext = NULL;
-        XMLContextHolder holder(xmlcontext);
-
         Response response = getBucketResponse(region, url, prefix, cred, marker);
-        xmlcontext = getXMLContext(response);
+        xmlParserCtxtPtr xmlptr = getXMLContext(response);
+        XMLContextHolder holder(xmlptr);  // protect from memleak
 
         if (response.isSuccess()) {
-            if (parseBucketXML(result, xmlcontext, marker)) {
+            if (parseBucketXML(result, xmlptr, marker)) {
                 continue;
             }
         } else {
-            parseXMLMessage(xmlcontext);
+            parseXMLMessage(xmlptr);
         }
 
         delete result;
@@ -308,7 +306,10 @@ uint64_t S3Service::fetchData(uint64_t offset, char *data, uint64_t len, const s
         return responseData.size();
     } else if (resp.getStatus() == RESPONSE_ERROR) {
         xmlParserCtxtPtr xmlptr = getXMLContext(resp);
-        parseXMLMessage(xmlptr);
+        if (xmlptr != NULL) {
+            XMLContextHolder holder(xmlptr);  // protect from memleak
+            parseXMLMessage(xmlptr);
+        }
 
         S3ERROR("Failed to fetch: %s, Response message: %s", sourceUrl.c_str(),
                 resp.getMessage().c_str());
@@ -356,7 +357,10 @@ S3CompressionType S3Service::checkCompressionType(const string &keyUrl, const st
     } else {
         if (resp.getStatus() == RESPONSE_ERROR) {
             xmlParserCtxtPtr xmlptr = getXMLContext(resp);
-            parseXMLMessage(xmlptr);
+            if (xmlptr != NULL) {
+                XMLContextHolder holder(xmlptr);  // protect from memleak
+                parseXMLMessage(xmlptr);
+            }
         }
         CHECK_OR_DIE_MSG(false, "Failed to fetch: %s, Response message: %s", keyUrl.c_str(),
                          resp.getMessage().c_str());

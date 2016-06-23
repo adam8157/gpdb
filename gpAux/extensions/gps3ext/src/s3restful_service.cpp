@@ -14,13 +14,6 @@
 
 using namespace std;
 
-S3RESTfulService::S3RESTfulService() {
-    curl_global_init(CURL_GLOBAL_ALL);
-}
-
-S3RESTfulService::~S3RESTfulService() {
-}
-
 // curl's write function callback.
 size_t RESTfulServiceCallback(char *ptr, size_t size, size_t nmemb, void *userp) {
     if (QueryCancelPending) {
