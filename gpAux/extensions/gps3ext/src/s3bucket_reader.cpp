@@ -30,10 +30,18 @@ S3BucketReader::S3BucketReader() : Reader() {
     this->segNum = -1;
 
     this->needNewReader = true;
+
+    // This function is not thread safe, must NOT call it when any other
+    // threads are running, that is, do NOT put it in layers under KeyReader.
+    curl_global_init(CURL_GLOBAL_ALL);
 }
 
 S3BucketReader::~S3BucketReader() {
     this->close();
+
+    // This function is not thread safe, must NOT call it when any other
+    // threads are running, that is, do NOT put it in layers under KeyReader.
+    curl_global_cleanup();
 }
 
 void S3BucketReader::open(const ReaderParams &params) {
