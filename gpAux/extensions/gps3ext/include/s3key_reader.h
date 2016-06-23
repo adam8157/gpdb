@@ -84,10 +84,10 @@ class S3KeyReader : public Reader {
           curReadingChunk(0),
           transferredKeyLen(0),
           s3interface(NULL) {
-        pthread_mutex_init(&this->mutex_key_reader, NULL);
+        pthread_mutex_init(&this->mutexErrorMessage, NULL);
     }
     virtual ~S3KeyReader() {
-        pthread_mutex_destroy(&this->mutex_key_reader);
+        pthread_mutex_destroy(&this->mutexErrorMessage);
     }
 
     void open(const ReaderParams& params);
@@ -111,10 +111,10 @@ class S3KeyReader : public Reader {
     }
 
     void setSharedError(bool sharedError, string message) {
-        pthread_mutex_lock(&this->mutex_key_reader);
+        pthread_mutex_lock(&this->mutexErrorMessage);
         this->sharedErrorMessage = message;
         this->sharedError = sharedError;
-        pthread_mutex_unlock(&this->mutex_key_reader);
+        pthread_mutex_unlock(&this->mutexErrorMessage);
     }
 
     const vector<pthread_t>& getThreads() const {
@@ -138,7 +138,7 @@ class S3KeyReader : public Reader {
     }
 
    private:
-    pthread_mutex_t mutex_key_reader;
+    pthread_mutex_t mutexErrorMessage;
 
     bool sharedError;
     string sharedErrorMessage;
@@ -188,7 +188,7 @@ class ChunkBuffer {
     void destroy();
 
     pthread_cond_t* getStatCond() {
-        return &stat_cond;
+        return &statusCondVar;
     }
 
     void setStatus(ChunkStatus status) {
@@ -207,8 +207,8 @@ class ChunkBuffer {
 
     ChunkStatus status;
 
-    pthread_mutex_t stat_mutex;
-    pthread_cond_t stat_cond;
+    pthread_mutex_t statusMutex;
+    pthread_cond_t statusCondVar;
 
     uint64_t curFileOffset;
     uint64_t curChunkOffset;

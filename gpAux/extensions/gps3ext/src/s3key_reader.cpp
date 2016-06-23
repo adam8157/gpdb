@@ -60,8 +60,8 @@ void ChunkBuffer::init() {
     chunkData = new char[offsetMgr.getChunkSize()];
     CHECK_OR_DIE_MSG(chunkData != NULL, "%s", "Failed to allocate Buffer, no enough memory?");
 
-    pthread_mutex_init(&this->stat_mutex, NULL);
-    pthread_cond_init(&this->stat_cond, NULL);
+    pthread_mutex_init(&this->statusMutex, NULL);
+    pthread_cond_init(&this->statusCondVar, NULL);
 }
 
 void ChunkBuffer::destroy() {
@@ -69,8 +69,8 @@ void ChunkBuffer::destroy() {
         delete this->chunkData;
         this->chunkData = NULL;
 
-        pthread_mutex_destroy(&this->stat_mutex);
-        pthread_cond_destroy(&this->stat_cond);
+        pthread_mutex_destroy(&this->statusMutex);
+        pthread_cond_destroy(&this->statusCondVar);
     }
 }
 
@@ -84,16 +84,17 @@ uint64_t ChunkBuffer::read(char* buf, uint64_t len) {
     // ReadyToFill, second call hangs.
     CHECK_OR_DIE_MSG(!QueryCancelPending, "%s", "ChunkBuffer reading is interrupted by GPDB");
 
-    pthread_mutex_lock(&this->stat_mutex);
+    pthread_mutex_lock(&this->statusMutex);
     while (this->status != ReadyToRead) {
-        pthread_cond_wait(&this->stat_cond, &this->stat_mutex);
+        pthread_cond_wait(&this->statusCondVar, &this->statusMutex);
     }
 
     // Error is shared between all chunks.
     if (this->isError()) {
-        pthread_mutex_unlock(&this->stat_mutex);
+        pthread_mutex_unlock(&this->statusMutex);
+        // Don't throw here. Other chunks will set the shared error message,
+        // it will be handled by S3KeyReader.
         return 0;
-        // CHECK_OR_DIE_MSG(false, "%s", "ChunkBuffers encounter a downloading error.");
     }
 
     uint64_t leftLen = this->chunkDataSize - this->curChunkOffset;
@@ -115,20 +116,20 @@ uint64_t ChunkBuffer::read(char* buf, uint64_t len) {
             this->curFileOffset = range.offset;
             this->chunkDataSize = range.length;
 
-            pthread_cond_signal(&this->stat_cond);
+            pthread_cond_signal(&this->statusCondVar);
         }
     }
 
-    pthread_mutex_unlock(&this->stat_mutex);
+    pthread_mutex_unlock(&this->statusMutex);
 
     return lenToRead;
 }
 
 // returning -1 means error
 uint64_t ChunkBuffer::fill() {
-    pthread_mutex_lock(&this->stat_mutex);
+    pthread_mutex_lock(&this->statusMutex);
     while (this->status != ReadyToFill) {
-        pthread_cond_wait(&this->stat_cond, &this->stat_mutex);
+        pthread_cond_wait(&this->statusCondVar, &this->statusMutex);
     }
 
     uint64_t offset = this->curFileOffset;
@@ -161,8 +162,8 @@ uint64_t ChunkBuffer::fill() {
     }
 
     this->status = ReadyToRead;
-    pthread_cond_signal(&this->stat_cond);
-    pthread_mutex_unlock(&this->stat_mutex);
+    pthread_cond_signal(&this->statusCondVar);
+    pthread_mutex_unlock(&this->statusMutex);
 
     return (this->isError()) ? -1 : readLen;
 }
