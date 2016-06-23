@@ -89,10 +89,10 @@ class S3Service : public S3Interface {
 
     void parseBucketXML(ListBucketResult* result, xmlParserCtxtPtr xmlcontext, string& marker);
 
-    xmlParserCtxtPtr getBucketXML(const string& region, const string& url, const string& prefix,
-                                  const S3Credential& cred, const string& marker);
+    Response getBucketResponse(const string& region, const string& url, const string& prefix,
+                               const S3Credential& cred, const string& marker);
 
-    bool checkXMLMessage(xmlParserCtxtPtr xmlcontext);
+    void parseXMLMessage(xmlParserCtxtPtr xmlcontext);
 
     HTTPHeaders composeHTTPHeaders(const string& url, const string& marker, const string& prefix,
                                    const string& region, const S3Credential& cred);

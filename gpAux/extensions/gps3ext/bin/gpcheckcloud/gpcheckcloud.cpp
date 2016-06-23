@@ -7,6 +7,7 @@ int main(int argc, char *argv[]) {
     bool ret = true;
 
     s3ext_loglevel = EXT_ERROR;
+    s3ext_logtype = STDERR_LOG;
 
     if (argc == 1) {
         print_usage(stderr);
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]) {
     if (ret) {
         exit(EXIT_SUCCESS);
     } else {
-        fprintf(stderr, "Failed. Please check the arguments.\n\n");
+        fprintf(stderr, "Failed. Please check the arguments and configuration file.\n\n");
         print_usage(stderr);
         exit(EXIT_FAILURE);
     }
@@ -94,7 +95,6 @@ bool check_config(const char *url_with_options) {
 
     GPReader *reader = reader_init(url_with_options);
     if (!reader) {
-        fprintf(stderr, "Failed to initialize reader\n");
         return false;
     }
 
@@ -127,7 +127,6 @@ bool s3_download(const char *url_with_options) {
 
     GPReader *reader = reader_init(url_with_options);
     if (!reader) {
-        fprintf(stderr, "Failed to initialize reader\n");
         return false;
     }
 
