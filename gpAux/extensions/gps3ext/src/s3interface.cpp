@@ -110,6 +110,10 @@ Response S3Service::getBucketResponse(const string &region, const string &url, c
 
 // parseXMLMessage must not throw exception, otherwise result is leaked.
 void S3Service::parseXMLMessage(xmlParserCtxtPtr xmlcontext) {
+    if (xmlcontext == NULL) {
+        return;
+    }
+
     xmlNode *rootElement = xmlDocGetRootElement(xmlcontext->myDoc);
     if (rootElement == NULL) {
         S3ERROR("Failed to parse returned xml of bucket list");
@@ -132,16 +136,16 @@ void S3Service::parseXMLMessage(xmlParserCtxtPtr xmlcontext) {
 }
 
 // parseBucketXML must not throw exception, otherwise result is leaked.
-void S3Service::parseBucketXML(ListBucketResult *result, xmlParserCtxtPtr xmlcontext,
+bool S3Service::parseBucketXML(ListBucketResult *result, xmlParserCtxtPtr xmlcontext,
                                string &marker) {
     if ((result == NULL) || (xmlcontext == NULL)) {
-        return;
+        return false;
     }
 
     xmlNode *rootElement = xmlDocGetRootElement(xmlcontext->myDoc);
     if (rootElement == NULL) {
         S3WARN("Failed to parse returned xml of bucket list");
-        return;
+        return false;
     }
 
     xmlNodePtr cur;
@@ -230,7 +234,7 @@ void S3Service::parseBucketXML(ListBucketResult *result, xmlParserCtxtPtr xmlcon
         xmlFree(key);
     }
 
-    return;
+    return true;
 }
 
 // ListBucket list all keys in given bucket with given prefix.
@@ -262,17 +266,15 @@ ListBucketResult *S3Service::listBucket(const string &schema, const string &regi
         xmlcontext = getXMLContext(response);
 
         if (response.isSuccess()) {
-            parseBucketXML(result, xmlcontext, marker);
-        } else {
-            //            S3WARN("Failed to GET bucket list of '%s'", url.c_str());
-
-            if (xmlcontext != NULL) {
-                parseXMLMessage(xmlcontext);
+            if (parseBucketXML(result, xmlcontext, marker)) {
+                continue;
             }
-
-            delete result;
-            return NULL;
+        } else {
+            parseXMLMessage(xmlcontext);
         }
+
+        delete result;
+        return NULL;
     } while (!marker.empty());
 
     return result;

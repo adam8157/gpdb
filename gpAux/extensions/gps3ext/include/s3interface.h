@@ -87,7 +87,7 @@ class S3Service : public S3Interface {
     string getUrl(const string& prefix, const string& schema, const string& host,
                   const string& bucket, const string& marker);
 
-    void parseBucketXML(ListBucketResult* result, xmlParserCtxtPtr xmlcontext, string& marker);
+    bool parseBucketXML(ListBucketResult* result, xmlParserCtxtPtr xmlcontext, string& marker);
 
     Response getBucketResponse(const string& region, const string& url, const string& prefix,
                                const S3Credential& cred, const string& marker);
