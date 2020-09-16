@@ -4871,12 +4871,20 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 
 				if (rel->rd_rel->relispartition)
 				{
-					ereport(ERROR,
-							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-							 errmsg("cannot expand leaf or interior partition \"%s\"",
-									RelationGetRelationName(rel)),
-							 errdetail("Root/leaf/interior partitions need to have same numsegments"),
-							 errhint("Call ALTER TABLE EXPAND TABLE on the root table instead")));
+					case PART_STATUS_NONE:
+					case PART_STATUS_ROOT:
+					case PART_STATUS_INTERIOR:
+						break;
+
+					case PART_STATUS_LEAF:
+						ereport(ERROR,
+								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+								 errmsg("cannot expand leaf partition \"%s\"",
+										RelationGetRelationName(rel)),
+								 errdetail("root/leaf/interior partitions need to have same numsegments"),
+								 errhint("use \"ALTER TABLE %s EXPAND TABLE\" instead",
+										 get_rel_name(rel_partition_get_master(relid)))));
+						break;
 				}
 			}
 
