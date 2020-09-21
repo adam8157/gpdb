@@ -1992,7 +1992,9 @@ typedef enum AlterTableType
 	AT_DropIdentity,			/* DROP IDENTITY */
 
 	AT_SetDistributedBy,		/* SET DISTRIBUTED BY */
-	AT_ExpandTable,          /* EXPAND DISTRIBUTED */
+
+	AT_ExpandTable,				/* EXPAND DISTRIBUTED */
+	AT_ExpandTablePrepare,		/* EXPAND PREPARE */
 
 	/* GPDB: Legacy commands to manipulate partitions */
 	AT_PartAdd,					/* Add */

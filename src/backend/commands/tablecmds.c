@@ -478,6 +478,7 @@ static void RangeVarCallbackForAlterRelation(const RangeVar *rv, Oid relid,
 
 static void ATExecExpandTable(List **wqueue, Relation rel, AlterTableCmd *cmd);
 static void ATExecExpandTableCTAS(AlterTableCmd *rootCmd, Relation rel, AlterTableCmd *cmd);
+static void ATExecExpandTablePrepare(List **wqueue, Relation rel, AlterTableCmd *cmd);
 
 static void ATExecSetDistributedBy(Relation rel, Node *node,
 								   AlterTableCmd *cmd);
@@ -5326,6 +5327,45 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			else
 				ATExecAttachPartitionIdx(wqueue, rel,
 										 ((PartitionCmd *) cmd->def)->name);
+		case AT_ExpandTablePrepare:	/* EXPAND TABLE PREPARE */
+			ATExecExpandTablePrepare(wqueue, rel, cmd);
+			break;
+			/* CDB: Partitioned Table commands */
+		case AT_PartAdd:				/* Add */
+		case AT_PartAddForSplit:		/* Add, as part of a Split */
+			ATPExecPartAdd(tab, rel, (AlterPartitionCmd *) cmd->def,
+						   cmd->subtype);
+			break;
+		case AT_PartAlter:				/* Alter */
+			ATPExecPartAlter(wqueue, tab, rel_p, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartDrop:				/* Drop */
+			ATPExecPartDrop(rel, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartExchange:			/* Exchange */
+			ATPExecPartExchange(tab, rel, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartRename:				/* Rename */
+			ATPExecPartRename(rel, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartSetTemplate:		/* Set Subpartition Template */
+			ATPExecPartSetTemplate(tab, rel, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartSplit:				/* Split */
+			/*
+			 * We perform heap_open and heap_close several times on
+			 * the relation object referenced by rel in this
+			 * method. After the method returns, we expect to
+			 * reference a valid relcache object through rel.
+			 */
+			ATPExecPartSplit(rel_p, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartTruncate:			/* Truncate */
+			ATPExecPartTruncate(rel, (AlterPartitionCmd *) cmd->def);
+			break;
+		case AT_PartAddInternal:
+			ATExecPartAddInternal(rel, cmd->def);
+>>>>>>> make gp_distributed_policy consistent
 			break;
 		case AT_DetachPartition:
 			/* ATPrepCmd ensures it must be a table */
@@ -16227,6 +16267,75 @@ checkPolicyCompatibleWithIndexes(Relation rel, GpPolicy *pol)
 	}
 
 	list_free(indexoidlist);
+}
+
+/*
+ * ALTER TABLE EXPAND TABLE PREPARE
+ *
+ * For partition tables, in order to support parallel expansion, numsegments
+ * need to be updated before expansion.
+ */
+static void
+ATExecExpandTablePrepare(List **wqueue, Relation rel, AlterTableCmd *cmd)
+{
+	AlteredTableInfo	*tab;
+	AlterTableCmd		*rootCmd;
+	MemoryContext		oldContext;
+	Oid					relid = RelationGetRelid(rel);
+	GpPolicy			*newPolicy;
+	GpPolicy			*policy = rel->rd_cdbpolicy;
+
+	if (Gp_role == GP_ROLE_UTILITY)
+		ereport(ERROR,
+			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			 errmsg("EXPAND not supported in utility mode")));
+
+	/* Permissions checks */
+	if (!pg_class_ownercheck(relid, GetUserId()))
+		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_CLASS,
+					   RelationGetRelationName(rel));
+
+	/* Can't ALTER TABLE SET system catalogs */
+	if (IsSystemRelation(rel))
+		ereport(ERROR,
+			(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+			errmsg("permission denied: \"%s\" is a system catalog", RelationGetRelationName(rel))));
+
+	oldContext = MemoryContextSwitchTo(GetMemoryChunkContext(rel));
+	newPolicy = GpPolicyCopy(policy);
+	MemoryContextSwitchTo(oldContext);
+
+	tab = linitial(*wqueue);
+	rootCmd = (AlterTableCmd *)linitial(tab->subcmds[AT_PASS_MISC]);
+
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+		/* only rootCmd is dispatched to QE, we can store */
+		if (rootCmd == cmd)
+			rootCmd->def = (Node*)makeNode(ExpandStmtSpec);
+	}
+
+	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
+	{
+		if (rel_is_external_table(relid))
+		{
+			ExtTableEntry *ext = GetExtTableEntry(relid);
+
+			if (!ext->iswritable)
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("unsupported ALTER command for external table")));
+		}
+		else
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("unsupported ALTER command for foreign table")));
+
+		relation_close(rel, NoLock);
+	}
+	/* Update numsegments to cluster size */
+	newPolicy->numsegments = getgpsegmentCount();
+	GpPolicyReplace(relid, newPolicy);
 }
 
 /*
