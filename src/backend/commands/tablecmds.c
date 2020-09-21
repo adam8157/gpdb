@@ -4479,6 +4479,7 @@ AlterTableGetLockLevel(List *cmds)
 				 * good. Stronger lock is mostly not required.
 				 */
 			case AT_PartTruncate:
+			case AT_ExpandTablePrepare:
 			case AT_PartAlter:
 				cmd_lockmode = AccessShareLock;
 				break;
@@ -4857,6 +4858,8 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_MISC;
 			break;
 		case AT_ExpandTable:
+		case AT_ExpandTablePrepare:
+			/* External tables can be expanded */
 			ATSimplePermissions(rel, ATT_TABLE | ATT_FOREIGN_TABLE);
 
 			/* GPDB_12_MERGE_FIXME: do we have these checks on ATTACH? */
