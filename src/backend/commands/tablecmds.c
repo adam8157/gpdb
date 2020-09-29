@@ -4875,20 +4875,12 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 
 				if (rel->rd_rel->relispartition)
 				{
-					case PART_STATUS_NONE:
-					case PART_STATUS_ROOT:
-					case PART_STATUS_INTERIOR:
-						break;
-
-					case PART_STATUS_LEAF:
-						ereport(ERROR,
-								(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-								 errmsg("cannot expand leaf partition \"%s\"",
-										RelationGetRelationName(rel)),
-								 errdetail("root/leaf/interior partitions need to have same numsegments"),
-								 errhint("use \"ALTER TABLE %s EXPAND TABLE\" instead",
-										 get_rel_name(rel_partition_get_master(relid)))));
-						break;
+					ereport(ERROR,
+							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+							 errmsg("cannot expand leaf or interior partition \"%s\"",
+									RelationGetRelationName(rel)),
+							 errdetail("Root/leaf/interior partitions need to have same numsegments"),
+							 errhint("Call ALTER TABLE EXPAND TABLE on the root table instead")));
 				}
 			}
 
@@ -5332,43 +5324,6 @@ ATExecCmd(List **wqueue, AlteredTableInfo *tab, Relation rel,
 										 ((PartitionCmd *) cmd->def)->name);
 		case AT_ExpandTablePrepare:	/* EXPAND TABLE PREPARE */
 			ATExecExpandTablePrepare(wqueue, rel, cmd);
-			break;
-			/* CDB: Partitioned Table commands */
-		case AT_PartAdd:				/* Add */
-		case AT_PartAddForSplit:		/* Add, as part of a Split */
-			ATPExecPartAdd(tab, rel, (AlterPartitionCmd *) cmd->def,
-						   cmd->subtype);
-			break;
-		case AT_PartAlter:				/* Alter */
-			ATPExecPartAlter(wqueue, tab, rel_p, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartDrop:				/* Drop */
-			ATPExecPartDrop(rel, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartExchange:			/* Exchange */
-			ATPExecPartExchange(tab, rel, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartRename:				/* Rename */
-			ATPExecPartRename(rel, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartSetTemplate:		/* Set Subpartition Template */
-			ATPExecPartSetTemplate(tab, rel, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartSplit:				/* Split */
-			/*
-			 * We perform heap_open and heap_close several times on
-			 * the relation object referenced by rel in this
-			 * method. After the method returns, we expect to
-			 * reference a valid relcache object through rel.
-			 */
-			ATPExecPartSplit(rel_p, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartTruncate:			/* Truncate */
-			ATPExecPartTruncate(rel, (AlterPartitionCmd *) cmd->def);
-			break;
-		case AT_PartAddInternal:
-			ATExecPartAddInternal(rel, cmd->def);
->>>>>>> make gp_distributed_policy consistent
 			break;
 		case AT_DetachPartition:
 			/* ATPrepCmd ensures it must be a table */
@@ -16295,7 +16250,7 @@ ATExecExpandTablePrepare(List **wqueue, Relation rel, AlterTableCmd *cmd)
 
 	/* Permissions checks */
 	if (!pg_class_ownercheck(relid, GetUserId()))
-		aclcheck_error(ACLCHECK_NOT_OWNER, ACL_KIND_CLASS,
+		aclcheck_error(ACLCHECK_NOT_OWNER, OBJECT_TABLE,
 					   RelationGetRelationName(rel));
 
 	/* Can't ALTER TABLE SET system catalogs */
@@ -16310,13 +16265,6 @@ ATExecExpandTablePrepare(List **wqueue, Relation rel, AlterTableCmd *cmd)
 
 	tab = linitial(*wqueue);
 	rootCmd = (AlterTableCmd *)linitial(tab->subcmds[AT_PASS_MISC]);
-
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		/* only rootCmd is dispatched to QE, we can store */
-		if (rootCmd == cmd)
-			rootCmd->def = (Node*)makeNode(ExpandStmtSpec);
-	}
 
 	if (rel->rd_rel->relkind == RELKIND_FOREIGN_TABLE)
 	{
