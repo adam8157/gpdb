@@ -4805,7 +4805,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_SetDistributedBy:	/* SET DISTRIBUTED BY */
 			ATSimplePermissions(rel, ATT_TABLE);
 
-			if ( !recursing ) /* MPP-5772, MPP-5784 */
+			if (!recursing) /* MPP-5772, MPP-5784 */
 			{
 				DistributedBy *ldistro;
 				GpPolicy   *policy;
@@ -4820,7 +4820,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				{
 					ldistro->numsegments = rel->rd_cdbpolicy->numsegments;
 
-					policy =  getPolicyForDistributedBy(ldistro, rel->rd_att);
+					policy = getPolicyForDistributedBy(ldistro, rel->rd_att);
 					if (!GpPolicyEqual(policy, rel->rd_cdbpolicy))
 					{
 						/* Reject interior branches of partitioned tables. */
@@ -4842,7 +4842,8 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 						if (!recurse)
 						{
 							/* Don't allow ALTER TABLE ONLY on a partitioned table */
-							if (RelationGetPartitionKey(rel))
+							/* FIXME should allow interior branches */
+							if (!rel->rd_rel->relispartition && RelationGetPartitionKey(rel))
 							{
 								ereport(ERROR,
 										(errcode(ERRCODE_WRONG_OBJECT_TYPE),
